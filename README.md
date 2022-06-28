@@ -1,1 +1,1 @@
-# ppkgmgr
+# private-package-manager

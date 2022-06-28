@@ -1,0 +1,20 @@
+version: 2
+
+repositories:
+  -
+    _comment: kernl
+    url: https://www.jal.co.jp/jp/ja/commonY20/img_sites
+    files:
+      -
+        file_name: icon_jtb.jpg
+        out_dir: ./kernel
+      -
+        file_name: icon_rakutentravel.jpg
+        out_dir: ./kernel\
+  -
+    _comment: イラスト
+    url: https://4.bp.blogspot.com/-Om1gGNrEO5c/Uku9aRy2IYI/AAAAAAAAYiI/WxXejqI9bIA/s400
+    files:
+      -
+        file_name: sweets_acai_bowl.png
+        out_dir: ./kernel
