@@ -1,5 +1,5 @@
 ###### Dockerfile
-FROM golang:latest
+FROM golang:1.20-bullseye
 
 ###### Env 
 ARG DEBIAN_FRONTEND=noninteractive

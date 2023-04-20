@@ -1,7 +1,6 @@
 package data
 
 import (
-	"fmt"
 	"io/ioutil"
 
 	yaml "gopkg.in/yaml.v3"
@@ -32,7 +31,6 @@ func Parse(path string) FileData {
 	}
 
 	err = yaml.Unmarshal(raw, &fd)
-	fmt.Print(fd)
 
 	return fd
 }
