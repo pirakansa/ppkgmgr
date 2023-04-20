@@ -1,0 +1,20 @@
+version: 2
+
+repositories:
+  -
+    _comment: jpeg
+    url: https://picsum.photos/200
+    files:
+      -
+        file_name: 200.jpg
+        out_dir: ./photos
+      -
+        file_name: 300.jpg
+        out_dir: ./photos
+  -
+    _comment: webp
+    url: https://picsum.photos/300
+    files:
+      -
+        file_name: 100.webp
+        out_dir: ./photos
