@@ -1,0 +1,5 @@
+{
+    "editor.renderWhitespace": "boundary",
+    "editor.accessibilitySupport": "off",
+    "diffEditor.ignoreTrimWhitespace": false
+}

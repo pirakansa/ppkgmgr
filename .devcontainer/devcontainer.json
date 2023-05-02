@@ -1,21 +1,9 @@
 {
-    "name": "ppkgmgr-proc",
+    "name": "golang-development-kit",
     "build": {
         "dockerfile": "Dockerfile",
         "args": {
             "UID": "1000"
-        }
-    },
-    "customizations": {
-        "vscode": {
-            "settings": {
-                "editor.renderWhitespace": "boundary",
-                "editor.accessibilitySupport": "off",
-                "diffEditor.ignoreTrimWhitespace": false
-            },
-            "extensions": [
-                "golang.Go"
-            ]
         }
     },
     "remoteUser": "builder"
