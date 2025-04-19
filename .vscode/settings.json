@@ -1,5 +1,16 @@
 {
     "editor.renderWhitespace": "boundary",
     "editor.accessibilitySupport": "off",
-    "diffEditor.ignoreTrimWhitespace": false
+    "diffEditor.ignoreTrimWhitespace": false,
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        {
+            "text": "Please write in English without exception."
+        },
+        {
+            "text": "Start the commit message by following the Conventional Commits format."
+        },
+        {
+            "text": "Then, describe the detailed changes for each file."
+        }          
+    ],
 }

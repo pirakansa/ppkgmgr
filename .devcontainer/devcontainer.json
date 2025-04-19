@@ -1,5 +1,4 @@
 {
-    "name": "golang-development-kit",
     "build": {
         "dockerfile": "Dockerfile",
         "args": {

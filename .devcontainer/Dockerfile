@@ -1,5 +1,5 @@
 ###### Dockerfile
-FROM golang:1.20-bullseye
+FROM golang:1.24-bullseye
 
 ###### Env 
 ARG USER=builder

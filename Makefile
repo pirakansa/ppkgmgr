@@ -7,7 +7,7 @@ LINUX_ARM   = linux-arm
 LINUX_ARM64 = linux-arm64
 WIN_AMD64   = win-amd64
 SRCDIR      = ./cmd/$(PROJECT_NAME)
-VERSION     = 0.2.0
+VERSION     = 0.2.1
 GO_LDFLAGS  = -ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
 
 
