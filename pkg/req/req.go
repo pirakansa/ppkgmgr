@@ -7,53 +7,53 @@ import (
 	"os"
 )
 
+var downloadClient = http.Client{
+	// // proxy is os environment
+	// Transport: &http.Transport{
+	// 	Proxy:                 http.ProxyURL(proxyUrl),
+	// 	ResponseHeaderTimeout: time.Duration(20) * time.Second,
+	// 	TLSHandshakeTimeout:   time.Duration(20) * time.Second,
+	// 	ExpectContinueTimeout: time.Duration(10) * time.Second,
+	// },
+	// Timeout: time.Duration(5) * time.Second,
+	CheckRedirect: func(r *http.Request, via []*http.Request) error {
+		r.URL.Opaque = r.URL.Path
+		return nil
+	},
+}
+
 func Download(url string, path string) int64 {
 
 	file, err := os.Create(path)
 
 	if err != nil {
-		fmt.Printf("Err: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "Err: %s\n", err.Error())
 		return 0
 	}
 
 	defer file.Close()
 
-	checkStatus := http.Client{
-		// // proxy is os environment
-		// Transport: &http.Transport{
-		// 	Proxy:                 http.ProxyURL(proxyUrl),
-		// 	ResponseHeaderTimeout: time.Duration(20) * time.Second,
-		// 	TLSHandshakeTimeout:   time.Duration(20) * time.Second,
-		// 	ExpectContinueTimeout: time.Duration(10) * time.Second,
-		// },
-		// Timeout: time.Duration(5) * time.Second,
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.URL.Opaque = r.URL.Path
-			return nil
-		},
-	}
-
-	response, err := checkStatus.Get(url)
+	response, err := downloadClient.Get(url)
 
 	if err != nil {
-		fmt.Printf("Err: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "Err: %s\n", err.Error())
 		return 0
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		fmt.Printf("Err: %s\n", url)
+		fmt.Fprintf(os.Stderr, "Err: %s\n", url)
 		return 0
 	}
 
 	filesize := response.ContentLength
 	dlsize, err := io.Copy(file, response.Body)
 	if (filesize != -1) && (dlsize != filesize) {
-		fmt.Printf("Truncated: %s\n", url)
+		fmt.Fprintf(os.Stderr, "Truncated: %s\n", url)
 	}
 
 	if err != nil {
-		fmt.Printf("Err: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "Err: %s\n", err.Error())
 		return 0
 	}
 
