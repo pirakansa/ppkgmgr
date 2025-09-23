@@ -1,46 +1,72 @@
 # Makefile
 
-PROJECT_NAME= ppkgmgr
-BINDIR      = ./bin
-LINUX_AMD64 = linux-amd64
-LINUX_ARM   = linux-arm
-LINUX_ARM64 = linux-arm64
-WIN_AMD64   = win-amd64
-SRCDIR      = ./cmd/$(PROJECT_NAME)
-VERSION     = 0.2.1
-GO_LDFLAGS  = -ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
-
+PROJECT_NAME := ppkgmgr
+BINDIR       := ./bin
+HOSTDIR      := $(BINDIR)/host
+LINUX_AMD64  := linux-amd64
+LINUX_ARM    := linux-arm
+LINUX_ARM64  := linux-arm64
+WIN_AMD64    := win-amd64
+CMD_DIR      := ./cmd/$(PROJECT_NAME)
+VERSION      := 0.2.1
+GO_LDFLAGS   := -ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
 
 all: build
 
 .PHONY: build
 build:
-	@go build -o $(BINDIR)/host/ $(SRCDIR)
+	@mkdir -p $(HOSTDIR)
+	@go build -o $(HOSTDIR)/ $(CMD_DIR)
 
+.PHONY: run
+run:
+	@go run $(CMD_DIR)
+
+.PHONY: release
 release: $(LINUX_AMD64) $(LINUX_ARM) $(LINUX_ARM64)
 
 $(LINUX_AMD64):
-	@GOOS=linux   GOARCH=amd64 go build $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_AMD64)/   $(SRCDIR)
+	@mkdir -p $(BINDIR)/$(LINUX_AMD64)
+	@GOOS=linux   GOARCH=amd64 go build $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_AMD64)/   $(CMD_DIR)
 	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_AMD64)/ --file=./$(PROJECT_NAME)_$(LINUX_AMD64).tar.gz .
 $(LINUX_ARM):
-	@GOOS=linux   GOARCH=arm   go build $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_ARM)/     $(SRCDIR)
+	@mkdir -p $(BINDIR)/$(LINUX_ARM)
+	@GOOS=linux   GOARCH=arm   go build $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_ARM)/     $(CMD_DIR)
 	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_ARM)/   --file=./$(PROJECT_NAME)_$(LINUX_ARM).tar.gz .
 $(LINUX_ARM64):
-	@GOOS=linux   GOARCH=arm64 go build $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_ARM64)/   $(SRCDIR)
+	@mkdir -p $(BINDIR)/$(LINUX_ARM64)
+	@GOOS=linux   GOARCH=arm64 go build $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_ARM64)/   $(CMD_DIR)
 	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_ARM64)/ --file=./$(PROJECT_NAME)_$(LINUX_ARM64).tar.gz .
 $(WIN_AMD64):
-	@GOOS=windows GOARCH=amd64 go build $(GO_LDFLAGS) -o $(BINDIR)/$(WIN_AMD64)/     $(SRCDIR)
+	@mkdir -p $(BINDIR)/$(WIN_AMD64)
+	@GOOS=windows GOARCH=amd64 go build $(GO_LDFLAGS) -o $(BINDIR)/$(WIN_AMD64)/     $(CMD_DIR)
 	@tar --gunzip --create --directory=$(BINDIR)/$(WIN_AMD64)/   --file=./$(PROJECT_NAME)_$(WIN_AMD64).tar.gz .
 
-debug: 
-	@go run -tags=debug $(SRCDIR)
+.PHONY: debug
+debug:
+	@go run -tags=debug $(CMD_DIR)
+
+.PHONY: vet
+vet:
+	@go vet ./...
+
+.PHONY: staticcheck
+staticcheck:
+	@staticcheck ./...
+
+.PHONY: govulncheck
+govulncheck:
+	@govulncheck ./...
+
+.PHONY: lint
+lint: vet staticcheck
 
 .PHONY: test
-test: 
+test: lint
 	@go test -v ./...
 
+.PHONY: clean
 clean:
 	@rm -fr $(BINDIR)
 	@rm -f  ./$(PROJECT_NAME)_*.tar.gz
 	@go clean
-

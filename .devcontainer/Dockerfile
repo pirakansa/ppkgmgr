@@ -15,9 +15,8 @@ RUN apt update -y && \
     | zstd -d -o /usr/local/bin/codex && \
     chmod a+x /usr/local/bin/codex && \
 
-    apt clean && \
-    rm -rf /var/log/* ; \
-    rm -rf /tmp/*
+    go install golang.org/x/vuln/cmd/govulncheck@latest && \
+    go install honnef.co/go/tools/cmd/staticcheck@latest
 
 
 ARG CONTAINER_USERNAME=builder

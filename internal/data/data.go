@@ -1,7 +1,8 @@
 package data
 
 import (
-	"io/ioutil"
+	"fmt"
+	"os"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -22,15 +23,17 @@ type File struct {
 	OutDir   string `yaml:"out_dir"`
 }
 
-func Parse(path string) FileData {
+func Parse(path string) (FileData, error) {
 	var fd FileData
 
-	raw, err := ioutil.ReadFile(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return fd
+		return fd, fmt.Errorf("read file: %w", err)
 	}
 
-	err = yaml.Unmarshal(raw, &fd)
+	if err := yaml.Unmarshal(raw, &fd); err != nil {
+		return fd, fmt.Errorf("decode yaml: %w", err)
+	}
 
-	return fd
+	return fd, nil
 }

@@ -13,7 +13,7 @@ var (
 )
 
 func defaultData(val string, def string) string {
-	if "" == val {
+	if val == "" {
 		return def
 	}
 	return val
@@ -34,18 +34,22 @@ func main() {
 	}
 
 	if len(flag.Args()) < 1 {
-		fmt.Println("require args")
+		fmt.Fprintln(os.Stderr, "require args")
 		os.Exit(1)
 	}
 
 	path := flag.Arg(0)
 
 	if _, err := os.Stat(path); err != nil {
-		fmt.Println("not found path")
+		fmt.Fprintln(os.Stderr, "not found path")
 		os.Exit(2)
 	}
 
-	fd := data.Parse(path)
+	fd, err := data.Parse(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to parse data: %v\n", err)
+		os.Exit(3)
+	}
 
 	for _, repo := range fd.Repo {
 		for _, fs := range repo.Files {
@@ -53,7 +57,7 @@ func main() {
 			outdir := defaultData(fs.OutDir, ".")
 			outname := defaultData(fs.Rename, fs.FileName)
 			dlpath := fmt.Sprintf("%s/%s", outdir, outname)
-			if spider == true {
+			if spider {
 				fmt.Printf("%s   %s\n", dlurl, dlpath)
 			} else {
 				req.Download(dlurl, dlpath)
