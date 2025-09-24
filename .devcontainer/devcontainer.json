@@ -1,5 +1,6 @@
 {
     "initializeCommand": "${localWorkspaceFolder}/.devcontainer/init.sh",
+    "onCreateCommand": "sudo apt-get update && sudo apt-get install -y openssh-client",
     "build": {
         "dockerfile": "Dockerfile",
         "args": {
