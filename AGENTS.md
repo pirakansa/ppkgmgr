@@ -240,4 +240,7 @@ Template example:
 
 ## 15. Checklist
 
-*
+* [ ] `make lint`
+* [ ] `make test`
+* [ ] `make build`
+

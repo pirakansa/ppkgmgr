@@ -17,3 +17,7 @@
 /bin
 /*.tar.gz
 /.env
+/.cache
+/.gocache
+/.gomodcache
+/.gopath
