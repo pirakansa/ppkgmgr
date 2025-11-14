@@ -34,8 +34,10 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 	fs.SetOutput(stderr)
 	var spider bool
 	var ver bool
+	var filePath string
 	fs.BoolVar(&spider, "spider", false, "no act")
 	fs.BoolVar(&ver, "v", false, "print version")
+	fs.StringVar(&filePath, "f", "", "path or URL to manifest")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -45,12 +47,17 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 		return 0
 	}
 
-	if len(fs.Args()) < 1 {
-		fmt.Fprintln(stderr, "require args")
+	if filePath == "" {
+		fmt.Fprintln(stderr, "require -f option")
 		return 1
 	}
 
-	path := fs.Arg(0)
+	if len(fs.Args()) > 0 {
+		fmt.Fprintln(stderr, "unexpected arguments")
+		return 1
+	}
+
+	path := filePath
 
 	if !isRemotePath(path) {
 		if _, err := os.Stat(path); err != nil {
