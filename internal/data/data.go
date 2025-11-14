@@ -19,6 +19,7 @@ type Repositories struct {
 
 type File struct {
 	FileName string `yaml:"file_name"`
+	Digest   string `yaml:"digest,omitempty"`
 	Rename   string `yaml:"rename,omitempty"`
 	OutDir   string `yaml:"out_dir"`
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 
 	"ppkgmgr/internal/data"
 	"ppkgmgr/pkg/req"
+
+	"github.com/zeebo/blake3"
 )
 
 var (
@@ -78,6 +81,18 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 			if _, err := downloader(dlurl, dlpath); err != nil {
 				fmt.Fprintf(stderr, "failed to download %s: %v\n", dlurl, err)
 				downloadErr = err
+				continue
+			}
+
+			if fs.Digest != "" {
+				match, actual, err := verifyDigest(dlpath, fs.Digest)
+				if err != nil {
+					fmt.Fprintf(stderr, "warning: failed to verify digest for %s: %v\n", dlpath, err)
+					continue
+				}
+				if !match {
+					fmt.Fprintf(stderr, "warning: digest mismatch for %s (expected %s, got %s)\n", dlpath, fs.Digest, actual)
+				}
 			}
 		}
 	}
@@ -92,4 +107,27 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 func main() {
 	code := run(os.Args[1:], os.Stdout, os.Stderr, req.Download)
 	os.Exit(code)
+}
+
+func verifyDigest(path, expected string) (bool, string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return false, "", fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	hasher := blake3.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return false, "", fmt.Errorf("hash file: %w", err)
+	}
+
+	actual := hasher.Sum(nil)
+	actualHex := hex.EncodeToString(actual)
+
+	expected = strings.TrimSpace(expected)
+	if expected == "" {
+		return true, actualHex, nil
+	}
+
+	return strings.EqualFold(expected, actualHex), actualHex, nil
 }
