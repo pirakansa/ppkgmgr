@@ -125,6 +125,31 @@ func TestRun_DownloadSuccess(t *testing.T) {
 	}
 }
 
+func TestRun_DownloadAbsoluteRename(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "config.yml")
+	content := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: ./out\n        rename: /etc/passwd\n"
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	downloader := func(url, path string) (int64, error) {
+		if path != filepath.Join("./out", "etc/passwd") {
+			t.Fatalf("unexpected path %q", path)
+		}
+		return 0, nil
+	}
+
+	exitCode := run([]string{yamlPath}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
 func TestRun_DownloadError(t *testing.T) {
 	dir := t.TempDir()
 	yamlPath := filepath.Join(dir, "config.yml")

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"ppkgmgr/internal/data"
 	"ppkgmgr/pkg/req"
@@ -64,6 +65,10 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 			dlurl := fmt.Sprintf("%s/%s", repo.Url, fs.FileName)
 			outdir := defaultData(fs.OutDir, ".")
 			outname := defaultData(fs.Rename, fs.FileName)
+			if filepath.IsAbs(outname) {
+				outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
+				outname = strings.TrimLeft(outname, "/\\")
+			}
 			dlpath := filepath.Join(outdir, outname)
 			if spider {
 				fmt.Fprintf(stdout, "%s   %s\n", dlurl, dlpath)
