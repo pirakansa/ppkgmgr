@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zeebo/blake3"
 )
 
 func TestDefaultData(t *testing.T) {
@@ -170,5 +174,73 @@ func TestRun_DownloadError(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "failed to download") {
 		t.Fatalf("expected download failure message, got %q", stderr.String())
+	}
+}
+
+func TestRun_DownloadDigestMatch(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "config.yml")
+	fileContent := []byte("digest test data")
+	hasher := blake3.New()
+	hasher.Write(fileContent)
+	digest := hex.EncodeToString(hasher.Sum(nil))
+
+	yamlContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: %s\n        digest: %s\n", dir, digest)
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	downloader := func(url, path string) (int64, error) {
+		if url != "https://example.com/file.txt" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != filepath.Join(dir, "file.txt") {
+			t.Fatalf("unexpected path %q", path)
+		}
+		if err := os.WriteFile(path, fileContent, 0o644); err != nil {
+			return 0, err
+		}
+		return int64(len(fileContent)), nil
+	}
+
+	exitCode := run([]string{yamlPath}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_DownloadDigestMismatch(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "config.yml")
+	fileContent := []byte("digest mismatch data")
+	yamlContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: %s\n        digest: %s\n", dir, strings.Repeat("0", 64))
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	downloader := func(url, path string) (int64, error) {
+		if url != "https://example.com/file.txt" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != filepath.Join(dir, "file.txt") {
+			t.Fatalf("unexpected path %q", path)
+		}
+		if err := os.WriteFile(path, fileContent, 0o644); err != nil {
+			return 0, err
+		}
+		return int64(len(fileContent)), nil
+	}
+
+	exitCode := run([]string{yamlPath}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "warning: digest mismatch") {
+		t.Fatalf("expected digest mismatch warning, got %q", stderr.String())
 	}
 }

@@ -28,7 +28,7 @@ func TestParseSuccess(t *testing.T) {
 		t.Fatalf("expected 2 files, got %d", len(first.Files))
 	}
 	file := first.Files[0]
-	if file.FileName != "200.jpg" || file.OutDir != "./photos" || file.Rename != "" {
+	if file.FileName != "200.jpg" || file.OutDir != "./photos" || file.Rename != "" || file.Digest != "" {
 		t.Fatalf("unexpected file data: %+v", file)
 	}
 }
