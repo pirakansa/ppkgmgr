@@ -2,8 +2,12 @@ package data
 
 import (
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -57,5 +61,48 @@ func TestParseInvalidYAML(t *testing.T) {
 	_, err := Parse(path)
 	if err == nil {
 		t.Fatal("expected error for invalid yaml")
+	}
+}
+
+func TestParseRemoteSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-yaml")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "repositories:\n  - url: https://example.com\n    files:\n      - file_name: remote.txt\n        out_dir: ./remote\n")
+	}))
+	t.Cleanup(server.Close)
+
+	fd, err := Parse(server.URL + "/config.yml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(fd.Repo) != 1 {
+		t.Fatalf("expected 1 repository, got %d", len(fd.Repo))
+	}
+	repo := fd.Repo[0]
+	if repo.Url != "https://example.com" {
+		t.Fatalf("unexpected repo url: %q", repo.Url)
+	}
+	if len(repo.Files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(repo.Files))
+	}
+	if repo.Files[0].FileName != "remote.txt" {
+		t.Fatalf("unexpected file name: %q", repo.Files[0].FileName)
+	}
+}
+
+func TestParseRemoteUnexpectedStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+
+	_, err := Parse(server.URL + "/missing.yml")
+	if err == nil {
+		t.Fatal("expected error for unexpected status")
+	}
+	if !strings.Contains(err.Error(), "unexpected status") {
+		t.Fatalf("expected unexpected status error, got %v", err)
 	}
 }

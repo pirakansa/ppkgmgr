@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,9 +52,11 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 
 	path := fs.Arg(0)
 
-	if _, err := os.Stat(path); err != nil {
-		fmt.Fprintln(stderr, "not found path")
-		return 2
+	if !isRemotePath(path) {
+		if _, err := os.Stat(path); err != nil {
+			fmt.Fprintln(stderr, "not found path")
+			return 2
+		}
 	}
 
 	fd, err := data.Parse(path)
@@ -107,6 +110,16 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 func main() {
 	code := run(os.Args[1:], os.Stdout, os.Stderr, req.Download)
 	os.Exit(code)
+}
+
+func isRemotePath(path string) bool {
+	u, err := url.Parse(path)
+	if err != nil {
+		return false
+	}
+
+	scheme := strings.ToLower(u.Scheme)
+	return scheme == "http" || scheme == "https"
 }
 
 func verifyDigest(path, expected string) (bool, string, error) {

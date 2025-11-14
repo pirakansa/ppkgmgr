@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,6 +150,41 @@ func TestRun_DownloadAbsoluteRename(t *testing.T) {
 	exitCode := run([]string{yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_RemoteYAML(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/config.yml" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprint(w, "repositories:\n  - url: https://example.com\n    files:\n      - file_name: remote.txt\n        out_dir: ./out\n")
+	}))
+	t.Cleanup(server.Close)
+
+	var stdout, stderr bytes.Buffer
+	var called bool
+	downloader := func(url, path string) (int64, error) {
+		called = true
+		if url != "https://example.com/remote.txt" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != filepath.Join("./out", "remote.txt") {
+			t.Fatalf("unexpected path %q", path)
+		}
+		return 1, nil
+	}
+
+	exitCode := run([]string{server.URL + "/config.yml"}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if !called {
+		t.Fatalf("expected downloader to be called")
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", stderr.String())
