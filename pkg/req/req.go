@@ -1,64 +1,95 @@
 package req
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
-var downloadClient = http.Client{
-	// // proxy is os environment
-	// Transport: &http.Transport{
-	// 	Proxy:                 http.ProxyURL(proxyUrl),
-	// 	ResponseHeaderTimeout: time.Duration(20) * time.Second,
-	// 	TLSHandshakeTimeout:   time.Duration(20) * time.Second,
-	// 	ExpectContinueTimeout: time.Duration(10) * time.Second,
-	// },
-	// Timeout: time.Duration(5) * time.Second,
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+var downloadClient httpClient = &http.Client{
 	CheckRedirect: func(r *http.Request, via []*http.Request) error {
 		r.URL.Opaque = r.URL.Path
 		return nil
 	},
 }
 
-func Download(url string, path string) int64 {
-
-	file, err := os.Create(path)
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Err: %s\n", err.Error())
-		return 0
+func Download(url string, path string) (int64, error) {
+	if err := ensureDir(path); err != nil {
+		return 0, err
 	}
 
-	defer file.Close()
-
-	response, err := downloadClient.Get(url)
-
+	file, err := os.Create(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Err: %s\n", err.Error())
-		return 0
+		return 0, fmt.Errorf("create file: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		file.Close()
+		return 0, fmt.Errorf("create request: %w", err)
+	}
+
+	response, err := downloadClient.Do(req)
+	if err != nil {
+		file.Close()
+		removeOnError(path)
+		return 0, fmt.Errorf("execute request: %w", err)
+	}
+	if response.Body == nil {
+		file.Close()
+		removeOnError(path)
+		return 0, errors.New("empty response body")
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		fmt.Fprintf(os.Stderr, "Err: %s\n", url)
-		return 0
+		file.Close()
+		removeOnError(path)
+		return 0, fmt.Errorf("unexpected status: %s", response.Status)
 	}
 
 	filesize := response.ContentLength
 	dlsize, err := io.Copy(file, response.Body)
+	if err != nil {
+		file.Close()
+		removeOnError(path)
+		return dlsize, fmt.Errorf("copy body: %w", err)
+	}
+
+	if closeErr := file.Close(); closeErr != nil {
+		removeOnError(path)
+		return dlsize, fmt.Errorf("close file: %w", closeErr)
+	}
+
 	if (filesize != -1) && (dlsize != filesize) {
 		fmt.Fprintf(os.Stderr, "Truncated: %s\n", url)
 	}
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Err: %s\n", err.Error())
-		return 0
-	}
-
 	fmt.Printf("downloaded: %s => %s\n", url, path)
 
-	return dlsize
+	return dlsize, nil
+}
 
+func ensureDir(path string) error {
+	dir := filepath.Dir(path)
+	if dir == "." {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create dir: %w", err)
+	}
+	return nil
+}
+
+func removeOnError(path string) {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		fmt.Fprintf(os.Stderr, "cleanup failed: %v\n", err)
+	}
 }
