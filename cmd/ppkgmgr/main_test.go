@@ -1,0 +1,149 @@
+package main
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestDefaultData(t *testing.T) {
+	if got := defaultData("", "fallback"); got != "fallback" {
+		t.Fatalf("expected fallback, got %q", got)
+	}
+	if got := defaultData("value", "fallback"); got != "value" {
+		t.Fatalf("expected value, got %q", got)
+	}
+}
+
+func TestRun_Version(t *testing.T) {
+	Version = "1.2.3"
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"-v"}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stdout.String() != "Version : 1.2.3\n" {
+		t.Fatalf("unexpected stdout: %q", stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_RequireArgs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "require args") {
+		t.Fatalf("expected require args message, got %q", stderr.String())
+	}
+}
+
+func TestRun_PathNotFound(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"missing.yml"}, &stdout, &stderr, nil)
+	if exitCode != 2 {
+		t.Fatalf("expected exit code 2, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "not found path") {
+		t.Fatalf("expected not found path message, got %q", stderr.String())
+	}
+}
+
+func TestRun_ParseError(t *testing.T) {
+	dir := t.TempDir()
+	badFile := filepath.Join(dir, "bad.yml")
+	if err := os.WriteFile(badFile, []byte("repositories: ["), 0o644); err != nil {
+		t.Fatalf("failed to write bad file: %v", err)
+	}
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{badFile}, &stdout, &stderr, nil)
+	if exitCode != 3 {
+		t.Fatalf("expected exit code 3, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "failed to parse data") {
+		t.Fatalf("expected parse error message, got %q", stderr.String())
+	}
+}
+
+func TestRun_Spider(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "config.yml")
+	content := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: ./out\n"
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"--spider", yamlPath}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	expected := "https://example.com/file.txt   out/file.txt\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, got %q", expected, stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_DownloadSuccess(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "config.yml")
+	content := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: ./out\n        rename: saved.txt\n"
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	var called bool
+	downloader := func(url, path string) (int64, error) {
+		called = true
+		if url != "https://example.com/file.txt" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != filepath.Join("./out", "saved.txt") {
+			t.Fatalf("unexpected path %q", path)
+		}
+		return 123, nil
+	}
+
+	exitCode := run([]string{yamlPath}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if !called {
+		t.Fatalf("expected downloader to be called")
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_DownloadError(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "config.yml")
+	content := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n"
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	downloadErr := errors.New("download failed")
+	downloader := func(url, path string) (int64, error) {
+		return 0, downloadErr
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{yamlPath}, &stdout, &stderr, downloader)
+	if exitCode != 4 {
+		t.Fatalf("expected exit code 4, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "failed to download") {
+		t.Fatalf("expected download failure message, got %q", stderr.String())
+	}
+}
