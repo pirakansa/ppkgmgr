@@ -54,10 +54,12 @@ vet:
 
 .PHONY: staticcheck
 staticcheck:
+	@go install honnef.co/go/tools/cmd/staticcheck@latest
 	@staticcheck ./...
 
 .PHONY: govulncheck
 govulncheck:
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	@govulncheck -tags "$(GO_TAGS)" ./...
 
 .PHONY: lint
