@@ -47,8 +47,22 @@ func TestRun_RequireSubcommand(t *testing.T) {
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
-	if !strings.Contains(stderr.String(), "require subcommand") {
-		t.Fatalf("expected require subcommand message, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "run 'ppkgmgr help'") {
+		t.Fatalf("expected help suggestion, got %q", stderr.String())
+	}
+}
+
+func TestRun_Help(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"help"}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if !strings.Contains(stdout.String(), "Available commands") {
+		t.Fatalf("expected help text, got %q", stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
 	}
 }
 

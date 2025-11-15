@@ -33,11 +33,13 @@ func defaultData(val string, def string) string {
 
 func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "require subcommand")
+		fmt.Fprintln(stderr, "require subcommand (run 'ppkgmgr help' for usage)")
 		return 1
 	}
 
 	switch args[0] {
+	case "help", "-h", "--help":
+		return runHelp(args[1:], stdout, stderr)
 	case "ver":
 		return runVersion(args[1:], stdout, stderr)
 	case "dl":
@@ -225,6 +227,24 @@ func runPkgAdd(args []string, stdout, stderr io.Writer) int {
 	}
 
 	fmt.Fprintf(stdout, "registered manifest: %s\n", target)
+	return 0
+}
+
+func runHelp(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 {
+		fmt.Fprintf(stderr, "unknown help topic: %s\n", args[0])
+		return 1
+	}
+
+	fmt.Fprint(stdout, `Usage:
+  ppkgmgr <command> [options]
+
+Available commands:
+  dl        Download files from a manifest (use --spider to preview only)
+  pkg add   Register a manifest locally under ~/.ppkgmgr
+  ver       Print version information
+  help      Show this help message
+`)
 	return 0
 }
 

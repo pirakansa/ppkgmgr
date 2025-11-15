@@ -11,6 +11,7 @@
 
 ### Command Examples
 ```sh
+$ ppkgmgr help  # Display available subcommands and usage
 $ ppkgmgr dl <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
 $ ppkgmgr dl --spider <path_or_url_to_yaml>  # Preview download URLs and paths
 $ ppkgmgr pkg add <path_or_url_to_yaml>  # Backup the manifest under ~/.ppkgmgr for later use
