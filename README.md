@@ -39,6 +39,7 @@ repositories:
     files:
       -
         file_name: <name of the file to download>
+        digest: <optional BLAKE3 digest to verify the file>
         out_dir: <output directory for the file>
         rename: <optional new name for the file>
 ```
