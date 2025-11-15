@@ -24,9 +24,6 @@ RUN useradd -u ${CONTAINER_USERID} -s /bin/bash -m ${CONTAINER_USERNAME} && \
 
 USER ${CONTAINER_USERNAME}
 
-RUN go install golang.org/x/vuln/cmd/govulncheck@latest && \
-    go install honnef.co/go/tools/cmd/staticcheck@latest
-
 WORKDIR /work
 
 
