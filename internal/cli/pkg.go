@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"ppkgmgr/internal/data"
 	"ppkgmgr/internal/registry"
@@ -76,12 +77,17 @@ func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
 			continue
 		}
 
-		if err := refreshStoredManifest(entry); err != nil {
+		changed, err := refreshStoredManifest(entry)
+		if err != nil {
 			fmt.Fprintf(stderr, "warning: failed to refresh %s: %v\n", displayValue(entry.Source), err)
 			hadFailure = true
-		} else {
-			fmt.Fprintf(stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
+			continue
 		}
+		if !changed {
+			fmt.Fprintf(stdout, "manifest unchanged: %s\n", displayValue(entry.Source))
+			continue
+		}
+		fmt.Fprintf(stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
 
 		if _, err := os.Stat(entry.LocalPath); err != nil {
 			fmt.Fprintf(stderr, "warning: manifest unavailable for %s: %v\n", displayValue(entry.Source), err)
@@ -114,27 +120,28 @@ func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
 	return nil
 }
 
-func refreshStoredManifest(entry *registry.Entry) error {
+func refreshStoredManifest(entry *registry.Entry) (bool, error) {
 	raw, err := data.LoadRaw(entry.Source)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if err := os.MkdirAll(filepath.Dir(entry.LocalPath), 0o755); err != nil {
-		return err
+		return false, err
 	}
 
 	if err := os.WriteFile(entry.LocalPath, raw, 0o600); err != nil {
-		return err
+		return false, err
 	}
 
 	_, computed, err := verifyDigest(entry.LocalPath, "")
 	if err != nil {
-		return err
+		return false, err
 	}
+	changed := !strings.EqualFold(entry.Digest, computed)
 	entry.Digest = computed
 	if entry.ID == "" {
 		entry.ID = generateEntryID(entry.Source)
 	}
-	return nil
+	return changed, nil
 }

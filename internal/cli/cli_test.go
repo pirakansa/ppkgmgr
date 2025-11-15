@@ -670,3 +670,61 @@ func TestRunPkgUp_RefreshAndDownload(t *testing.T) {
 		t.Fatalf("expected success message, got %q", stdout.String())
 	}
 }
+
+func TestRunPkgUp_SkipWhenDigestMatches(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	sourceManifest := filepath.Join(dir, "source.yml")
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n", outDir)
+	if err := os.WriteFile(sourceManifest, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write source manifest: %v", err)
+	}
+
+	manifestPath := filepath.Join(home, "manifests", "cached.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifest dir: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write cached manifest: %v", err)
+	}
+	_, digest, err := verifyDigest(manifestPath, "")
+	if err != nil {
+		t.Fatalf("failed to hash manifest: %v", err)
+	}
+
+	store := registry.Store{
+		Entries: []registry.Entry{
+			{
+				ID:        "entry",
+				Source:    sourceManifest,
+				LocalPath: manifestPath,
+				Digest:    digest,
+				AddedAt:   time.Now().UTC(),
+			},
+		},
+	}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to seed registry: %v", err)
+	}
+
+	downloader := func(url, path string) (int64, error) {
+		t.Fatalf("unexpected download call: %s -> %s", url, path)
+		return 0, nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "up"}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "manifest unchanged") {
+		t.Fatalf("expected unchanged message, got %q", stdout.String())
+	}
+}
