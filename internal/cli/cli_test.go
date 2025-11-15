@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +17,21 @@ import (
 
 	"github.com/zeebo/blake3"
 )
+
+func newLocalHTTPServer(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip: failed to listen on loopback: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: listener,
+		Config:   &http.Server{Handler: handler},
+	}
+	server.Start()
+	t.Cleanup(server.Close)
+	return server
+}
 
 func TestDefaultData(t *testing.T) {
 	if got := defaultData("", "fallback"); got != "fallback" {
@@ -147,6 +163,32 @@ func TestRun_Spider(t *testing.T) {
 	}
 }
 
+func TestRun_SpiderWithExpandedOutDir(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "config.yml")
+	content := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: $HOME/.local/bin\n"
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	home := filepath.Join(dir, "home")
+	t.Setenv("HOME", home)
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dl", "--spider", yamlPath}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	wantPath := filepath.Join(home, ".local/bin", "file.txt")
+	expected := fmt.Sprintf("https://example.com/file.txt   %s\n", wantPath)
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, got %q", expected, stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
 func TestRun_DownloadSuccess(t *testing.T) {
 	dir := t.TempDir()
 	yamlPath := filepath.Join(dir, "config.yml")
@@ -206,14 +248,13 @@ func TestRun_DownloadAbsoluteRename(t *testing.T) {
 }
 
 func TestRun_RemoteYAML(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newLocalHTTPServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/config.yml" {
 			http.NotFound(w, r)
 			return
 		}
 		fmt.Fprint(w, "repositories:\n  - url: https://example.com\n    files:\n      - file_name: remote.txt\n        out_dir: ./out\n")
 	}))
-	t.Cleanup(server.Close)
 
 	var stdout, stderr bytes.Buffer
 	var called bool

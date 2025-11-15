@@ -19,6 +19,14 @@ func defaultData(val string, def string) string {
 	return val
 }
 
+func expandPath(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+
+	return os.ExpandEnv(path), nil
+}
+
 func storageDir() (string, error) {
 	if override := os.Getenv("PPKGMGR_HOME"); override != "" {
 		return override, nil

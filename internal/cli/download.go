@@ -49,6 +49,12 @@ func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
 				for _, fs := range repo.Files {
 					dlurl := fmt.Sprintf("%s/%s", repo.Url, fs.FileName)
 					outdir := defaultData(fs.OutDir, ".")
+					expandedDir, err := expandPath(outdir)
+					if err != nil {
+						fmt.Fprintf(stderr, "failed to expand output directory %q: %v\n", outdir, err)
+						return cliError{code: 3}
+					}
+					outdir = expandedDir
 					outname := defaultData(fs.Rename, fs.FileName)
 					if filepath.IsAbs(outname) {
 						outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
