@@ -58,7 +58,7 @@ func TestRun_Help(t *testing.T) {
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
-	if !strings.Contains(stdout.String(), "Available commands") {
+	if !strings.Contains(stdout.String(), "Available Commands") {
 		t.Fatalf("expected help text, got %q", stdout.String())
 	}
 	if stderr.Len() != 0 {
