@@ -739,7 +739,7 @@ func TestRunPkgUp_RemovesOldYamlOnChange(t *testing.T) {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		t.Fatalf("failed to create out dir: %v", err)
 	}
-	newContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: pkg-new.yml\n        out_dir: %s\n", outDir)
+	newContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: pkg-new.yml\n        rename: pkg-new-renamed\n        out_dir: %s\n", outDir)
 	if err := os.WriteFile(sourceManifest, []byte(newContent), 0o644); err != nil {
 		t.Fatalf("failed to write source manifest: %v", err)
 	}
@@ -748,12 +748,12 @@ func TestRunPkgUp_RemovesOldYamlOnChange(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
 		t.Fatalf("failed to create manifest dir: %v", err)
 	}
-	oldContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: pkg-old.yml\n        out_dir: %s\n", outDir)
+	oldContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: pkg-old.yml\n        rename: pkg-old-renamed\n        out_dir: %s\n", outDir)
 	if err := os.WriteFile(manifestPath, []byte(oldContent), 0o600); err != nil {
 		t.Fatalf("failed to write cached manifest: %v", err)
 	}
 
-	oldFile := filepath.Join(outDir, "pkg-old.yml")
+	oldFile := filepath.Join(outDir, "pkg-old-renamed")
 	if err := os.WriteFile(oldFile, []byte("stale"), 0o644); err != nil {
 		t.Fatalf("failed to write old package: %v", err)
 	}
@@ -774,7 +774,7 @@ func TestRunPkgUp_RemovesOldYamlOnChange(t *testing.T) {
 		t.Fatalf("failed to seed registry: %v", err)
 	}
 
-	newFile := filepath.Join(outDir, "pkg-new.yml")
+	newFile := filepath.Join(outDir, "pkg-new-renamed")
 	downloader := func(url, path string) (int64, error) {
 		if url != "https://example.com/pkg-new.yml" {
 			t.Fatalf("unexpected url %q", url)

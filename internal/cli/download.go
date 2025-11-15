@@ -113,16 +113,16 @@ func resolveDownloadPath(fs data.File) (string, error) {
 	return filepath.Join(outdir, outname), nil
 }
 
-func manifestOutputPaths(fd data.FileData) ([]string, error) {
-	var paths []string
+func manifestOutputPaths(fd data.FileData) ([]manifestTarget, error) {
+	var targets []manifestTarget
 	for _, repo := range fd.Repo {
 		for _, fs := range repo.Files {
 			path, err := resolveDownloadPath(fs)
 			if err != nil {
 				return nil, err
 			}
-			paths = append(paths, path)
+			targets = append(targets, manifestTarget{path: path})
 		}
 	}
-	return paths, nil
+	return targets, nil
 }

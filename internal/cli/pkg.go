@@ -79,9 +79,9 @@ func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
 			continue
 		}
 
-		var previousTargets []string
-		if manifestPaths, err := extractManifestTargets(entry.LocalPath); err == nil {
-			previousTargets = manifestPaths
+		var previousTargets []manifestTarget
+		if manifestTargets, err := extractManifestTargets(entry.LocalPath); err == nil {
+			previousTargets = manifestTargets
 		} else if !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stderr, "warning: failed to parse stored manifest %s: %v\n", displayValue(entry.Source), err)
 		}
@@ -99,7 +99,7 @@ func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
 		fmt.Fprintf(stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
 
 		if len(previousTargets) != 0 {
-			cleanupOldYAML(previousTargets, stderr)
+			cleanupOldTargets(previousTargets, stderr)
 		}
 
 		if _, err := os.Stat(entry.LocalPath); err != nil {
@@ -159,7 +159,7 @@ func refreshStoredManifest(entry *registry.Entry) (bool, error) {
 	return changed, nil
 }
 
-func extractManifestTargets(path string) ([]string, error) {
+func extractManifestTargets(path string) ([]manifestTarget, error) {
 	fd, err := data.Parse(path)
 	if err != nil {
 		return nil, err
@@ -167,14 +167,14 @@ func extractManifestTargets(path string) ([]string, error) {
 	return manifestOutputPaths(fd)
 }
 
-func cleanupOldYAML(paths []string, stderr io.Writer) {
-	for _, path := range paths {
-		lower := strings.ToLower(path)
-		if !(strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml")) {
-			continue
-		}
-		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			fmt.Fprintf(stderr, "warning: failed to remove outdated package %s: %v\n", path, err)
+func cleanupOldTargets(targets []manifestTarget, stderr io.Writer) {
+	for _, target := range targets {
+		if err := os.Remove(target.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stderr, "warning: failed to remove outdated file %s: %v\n", target.path, err)
 		}
 	}
+}
+
+type manifestTarget struct {
+	path string
 }
