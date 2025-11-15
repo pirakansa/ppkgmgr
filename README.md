@@ -42,6 +42,8 @@ repositories:
 
 For an example YAML file, refer to [testdata.yml](./test/data/testdata.yml).
 
+You can embed environment variables into `out_dir`. For example, `out_dir: $HOME/.local/bin` downloads files under `~/.local/bin` in your home directory.
+
 ## Development
 
 ### Build
