@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,6 +79,13 @@ func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
 			continue
 		}
 
+		var previousTargets []string
+		if manifestPaths, err := extractManifestTargets(entry.LocalPath); err == nil {
+			previousTargets = manifestPaths
+		} else if !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stderr, "warning: failed to parse stored manifest %s: %v\n", displayValue(entry.Source), err)
+		}
+
 		changed, err := refreshStoredManifest(entry)
 		if err != nil {
 			fmt.Fprintf(stderr, "warning: failed to refresh %s: %v\n", displayValue(entry.Source), err)
@@ -88,6 +97,10 @@ func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
 			continue
 		}
 		fmt.Fprintf(stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
+
+		if len(previousTargets) != 0 {
+			cleanupOldYAML(previousTargets, stderr)
+		}
 
 		if _, err := os.Stat(entry.LocalPath); err != nil {
 			fmt.Fprintf(stderr, "warning: manifest unavailable for %s: %v\n", displayValue(entry.Source), err)
@@ -144,4 +157,24 @@ func refreshStoredManifest(entry *registry.Entry) (bool, error) {
 		entry.ID = generateEntryID(entry.Source)
 	}
 	return changed, nil
+}
+
+func extractManifestTargets(path string) ([]string, error) {
+	fd, err := data.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+	return manifestOutputPaths(fd)
+}
+
+func cleanupOldYAML(paths []string, stderr io.Writer) {
+	for _, path := range paths {
+		lower := strings.ToLower(path)
+		if !(strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml")) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stderr, "warning: failed to remove outdated package %s: %v\n", path, err)
+		}
+	}
 }

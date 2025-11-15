@@ -728,3 +728,78 @@ func TestRunPkgUp_SkipWhenDigestMatches(t *testing.T) {
 		t.Fatalf("expected unchanged message, got %q", stdout.String())
 	}
 }
+
+func TestRunPkgUp_RemovesOldYamlOnChange(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	sourceManifest := filepath.Join(dir, "source.yml")
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	newContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: pkg-new.yml\n        out_dir: %s\n", outDir)
+	if err := os.WriteFile(sourceManifest, []byte(newContent), 0o644); err != nil {
+		t.Fatalf("failed to write source manifest: %v", err)
+	}
+
+	manifestPath := filepath.Join(home, "manifests", "cached.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifest dir: %v", err)
+	}
+	oldContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: pkg-old.yml\n        out_dir: %s\n", outDir)
+	if err := os.WriteFile(manifestPath, []byte(oldContent), 0o600); err != nil {
+		t.Fatalf("failed to write cached manifest: %v", err)
+	}
+
+	oldFile := filepath.Join(outDir, "pkg-old.yml")
+	if err := os.WriteFile(oldFile, []byte("stale"), 0o644); err != nil {
+		t.Fatalf("failed to write old package: %v", err)
+	}
+
+	store := registry.Store{
+		Entries: []registry.Entry{
+			{
+				ID:        "entry",
+				Source:    sourceManifest,
+				LocalPath: manifestPath,
+				Digest:    "old",
+				AddedAt:   time.Now().UTC(),
+			},
+		},
+	}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to seed registry: %v", err)
+	}
+
+	newFile := filepath.Join(outDir, "pkg-new.yml")
+	downloader := func(url, path string) (int64, error) {
+		if url != "https://example.com/pkg-new.yml" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != newFile {
+			t.Fatalf("unexpected download path %q", path)
+		}
+		if err := os.WriteFile(path, []byte("fresh"), 0o644); err != nil {
+			return 0, err
+		}
+		return 6, nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "up"}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if _, err := os.Stat(oldFile); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected old YAML to be removed, stat err=%v", err)
+	}
+	if _, err := os.Stat(newFile); err != nil {
+		t.Fatalf("expected new YAML to exist, got %v", err)
+	}
+	if data, err := os.ReadFile(manifestPath); err != nil || string(data) != newContent {
+		t.Fatalf("manifest not refreshed (err=%v, data=%q)", err, string(data))
+	}
+}

@@ -63,19 +63,11 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 	for _, repo := range fd.Repo {
 		for _, fs := range repo.Files {
 			dlurl := fmt.Sprintf("%s/%s", repo.Url, fs.FileName)
-			outdir := defaultData(fs.OutDir, ".")
-			expandedDir, err := expandPath(outdir)
+			dlpath, err := resolveDownloadPath(fs)
 			if err != nil {
-				fmt.Fprintf(stderr, "failed to expand output directory %q: %v\n", outdir, err)
+				fmt.Fprintf(stderr, "failed to determine download path for %s: %v\n", fs.FileName, err)
 				return cliError{code: 3}
 			}
-			outdir = expandedDir
-			outname := defaultData(fs.Rename, fs.FileName)
-			if filepath.IsAbs(outname) {
-				outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
-				outname = strings.TrimLeft(outname, "/\\")
-			}
-			dlpath := filepath.Join(outdir, outname)
 			if spider {
 				fmt.Fprintf(stdout, "%s   %s\n", dlurl, dlpath)
 				continue
@@ -104,4 +96,33 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 		return cliError{code: 4}
 	}
 	return nil
+}
+
+func resolveDownloadPath(fs data.File) (string, error) {
+	outdir := defaultData(fs.OutDir, ".")
+	expandedDir, err := expandPath(outdir)
+	if err != nil {
+		return "", fmt.Errorf("expand output directory %q: %w", outdir, err)
+	}
+	outdir = expandedDir
+	outname := defaultData(fs.Rename, fs.FileName)
+	if filepath.IsAbs(outname) {
+		outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
+		outname = strings.TrimLeft(outname, "/\\")
+	}
+	return filepath.Join(outdir, outname), nil
+}
+
+func manifestOutputPaths(fd data.FileData) ([]string, error) {
+	var paths []string
+	for _, repo := range fd.Repo {
+		for _, fs := range repo.Files {
+			path, err := resolveDownloadPath(fs)
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, path)
+		}
+	}
+	return paths, nil
 }
