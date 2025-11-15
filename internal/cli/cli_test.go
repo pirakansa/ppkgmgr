@@ -729,6 +729,74 @@ func TestRunPkgUp_SkipWhenDigestMatches(t *testing.T) {
 	}
 }
 
+func TestRunPkgUp_ForceFlagDownloadsWhenDigestMatches(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	sourceManifest := filepath.Join(dir, "source.yml")
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n", outDir)
+	if err := os.WriteFile(sourceManifest, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write source manifest: %v", err)
+	}
+
+	manifestPath := filepath.Join(home, "manifests", "cached.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifest dir: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write cached manifest: %v", err)
+	}
+	_, digest, err := verifyDigest(manifestPath, "")
+	if err != nil {
+		t.Fatalf("failed to hash manifest: %v", err)
+	}
+
+	store := registry.Store{
+		Entries: []registry.Entry{
+			{
+				ID:        "entry",
+				Source:    sourceManifest,
+				LocalPath: manifestPath,
+				Digest:    digest,
+				UpdatedAt: time.Now().UTC(),
+			},
+		},
+	}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to seed registry: %v", err)
+	}
+
+	var downloaded bool
+	downloader := func(url, path string) (int64, error) {
+		if url != "https://example.com/tool.bin" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != filepath.Join(outDir, "tool.bin") {
+			t.Fatalf("unexpected download path %q", path)
+		}
+		downloaded = true
+		return 0, nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "up", "-f"}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if !downloaded {
+		t.Fatalf("expected download to run")
+	}
+	if !strings.Contains(stdout.String(), "forced refresh") {
+		t.Fatalf("expected forced refresh message, got %q", stdout.String())
+	}
+}
+
 func TestRunPkgUp_ForceDownloadWhenNeverUpdated(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")

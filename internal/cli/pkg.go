@@ -30,7 +30,8 @@ func newPkgCmd(downloader DownloadFunc) *cobra.Command {
 }
 
 func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	cmd := &cobra.Command{
 		Use:   "up",
 		Short: "Refresh stored manifests and download referenced files",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -38,12 +39,14 @@ func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
 				fmt.Fprintln(cmd.ErrOrStderr(), "pkg up does not accept arguments")
 				return cliError{code: 1}
 			}
-			return handlePkgUp(cmd, downloader)
+			return handlePkgUp(cmd, downloader, force)
 		},
 	}
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "download even if the manifest digest matches")
+	return cmd
 }
 
-func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
+func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc, force bool) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
@@ -93,14 +96,17 @@ func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc) error {
 			hadFailure = true
 			continue
 		}
-		if !changed {
+		if !changed && !force {
 			fmt.Fprintf(stdout, "manifest unchanged: %s\n", displayValue(entry.Source))
 			continue
 		}
-		fmt.Fprintf(stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
-
-		if len(previousTargets) != 0 {
-			cleanupOldTargets(previousTargets, stderr)
+		if changed {
+			fmt.Fprintf(stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
+			if len(previousTargets) != 0 {
+				cleanupOldTargets(previousTargets, stderr)
+			}
+		} else {
+			fmt.Fprintf(stdout, "forced refresh: %s\n", displayValue(entry.Source))
 		}
 
 		if _, err := os.Stat(entry.LocalPath); err != nil {
