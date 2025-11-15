@@ -20,6 +20,7 @@ var downloadClient httpClient = &http.Client{
 	},
 }
 
+// Download retrieves the content at url and writes it to path, returning the number of bytes copied.
 func Download(url string, path string) (int64, error) {
 	if err := ensureDir(path); err != nil {
 		return 0, err
@@ -77,6 +78,7 @@ func Download(url string, path string) (int64, error) {
 	return dlsize, nil
 }
 
+// ensureDir creates the directory hierarchy required for path.
 func ensureDir(path string) error {
 	dir := filepath.Dir(path)
 	if dir == "." {
@@ -88,6 +90,7 @@ func ensureDir(path string) error {
 	return nil
 }
 
+// removeOnError best-effort deletes files created during a failed download.
 func removeOnError(path string) {
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		fmt.Fprintf(os.Stderr, "cleanup failed: %v\n", err)

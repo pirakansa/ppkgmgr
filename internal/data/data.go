@@ -11,16 +11,19 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+// FileData represents the manifest root document.
 type FileData struct {
 	Repo []Repositories `yaml:"repositories"`
 }
 
+// Repositories describes a manifest repository entry.
 type Repositories struct {
 	Comment string `yaml:"_comment"`
 	Url     string `yaml:"url"`
 	Files   []File `yaml:"files"`
 }
 
+// File describes a downloadable file entry.
 type File struct {
 	FileName string `yaml:"file_name"`
 	Digest   string `yaml:"digest,omitempty"`
@@ -28,6 +31,7 @@ type File struct {
 	OutDir   string `yaml:"out_dir"`
 }
 
+// Parse loads and decodes the manifest at the provided path.
 func Parse(path string) (FileData, error) {
 	var fd FileData
 
@@ -43,6 +47,7 @@ func Parse(path string) (FileData, error) {
 	return fd, nil
 }
 
+// loadYAML retrieves manifest contents from the filesystem or a remote source.
 func loadYAML(path string) ([]byte, error) {
 	if isRemotePath(path) {
 		return fetchRemoteYAML(path)
@@ -55,10 +60,12 @@ func loadYAML(path string) ([]byte, error) {
 	return raw, nil
 }
 
+// LoadRaw returns the raw manifest data located at path.
 func LoadRaw(path string) ([]byte, error) {
 	return loadYAML(path)
 }
 
+// isRemotePath reports whether the manifest is hosted at an HTTP(S) URL.
 func isRemotePath(path string) bool {
 	u, err := url.Parse(path)
 	if err != nil {
@@ -69,6 +76,7 @@ func isRemotePath(path string) bool {
 	return scheme == "http" || scheme == "https"
 }
 
+// fetchRemoteYAML downloads a manifest from a remote server.
 func fetchRemoteYAML(path string) ([]byte, error) {
 	resp, err := http.Get(path)
 	if err != nil {

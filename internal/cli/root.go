@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newRootCmd creates the root ppkgmgr command and attaches all subcommands.
 func newRootCmd(downloader DownloadFunc) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "ppkgmgr",

@@ -12,6 +12,7 @@ import (
 	"github.com/zeebo/blake3"
 )
 
+// defaultData returns def when val is empty.
 func defaultData(val string, def string) string {
 	if val == "" {
 		return def
@@ -19,6 +20,7 @@ func defaultData(val string, def string) string {
 	return val
 }
 
+// expandPath expands environment variables within path.
 func expandPath(path string) (string, error) {
 	if path == "" {
 		return "", nil
@@ -27,6 +29,7 @@ func expandPath(path string) (string, error) {
 	return os.ExpandEnv(path), nil
 }
 
+// storageDir determines the ppkgmgr working directory.
 func storageDir() (string, error) {
 	if override := os.Getenv("PPKGMGR_HOME"); override != "" {
 		return override, nil
@@ -38,6 +41,7 @@ func storageDir() (string, error) {
 	return filepath.Join(home, ".ppkgmgr"), nil
 }
 
+// isRemotePath reports whether the provided path is an HTTP(S) URL.
 func isRemotePath(path string) bool {
 	u, err := url.Parse(path)
 	if err != nil {
@@ -48,6 +52,7 @@ func isRemotePath(path string) bool {
 	return scheme == "http" || scheme == "https"
 }
 
+// verifyDigest computes a BLAKE3 digest for the file and compares it to the expected string.
 func verifyDigest(path, expected string) (bool, string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -71,6 +76,7 @@ func verifyDigest(path, expected string) (bool, string, error) {
 	return strings.EqualFold(expected, actualHex), actualHex, nil
 }
 
+// backupFileName generates a deterministic filename for storing manifest backups.
 func backupFileName(source string) string {
 	base := filepath.Base(source)
 	if base == "" || base == "." || base == string(filepath.Separator) {
@@ -82,6 +88,7 @@ func backupFileName(source string) string {
 	return fmt.Sprintf("%s_%s", prefix, base)
 }
 
+// sanitizeFileName converts arbitrary input into a filesystem-friendly name.
 func sanitizeFileName(name string) string {
 	var builder strings.Builder
 	for _, r := range name {
@@ -101,6 +108,7 @@ func sanitizeFileName(name string) string {
 	return result
 }
 
+// generateEntryID derives a stable identifier for a manifest source.
 func generateEntryID(source string) string {
 	sum := blake3.Sum256([]byte(source))
 	return hex.EncodeToString(sum[:8])

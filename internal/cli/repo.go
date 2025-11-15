@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newRepoCmd constructs the `repo` command used to manage manifest metadata.
 func newRepoCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "repo",
@@ -32,6 +33,7 @@ func newRepoCmd() *cobra.Command {
 	return cmd
 }
 
+// newRepoAddCmd registers new manifests with the local registry.
 func newRepoAddCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "add <manifest>",
@@ -46,6 +48,7 @@ func newRepoAddCmd() *cobra.Command {
 	}
 }
 
+// newRepoLsCmd lists the manifests recorded in the registry.
 func newRepoLsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "ls",
@@ -60,6 +63,7 @@ func newRepoLsCmd() *cobra.Command {
 	}
 }
 
+// newRepoRmCmd removes manifests from the registry.
 func newRepoRmCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rm <id_or_source>",
@@ -74,6 +78,7 @@ func newRepoRmCmd() *cobra.Command {
 	}
 }
 
+// handleRepoAdd processes the `repo add` workflow.
 func handleRepoAdd(cmd *cobra.Command, source string) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
@@ -168,6 +173,7 @@ func handleRepoAdd(cmd *cobra.Command, source string) error {
 	return nil
 }
 
+// handleRepoLs processes the `repo ls` workflow.
 func handleRepoLs(cmd *cobra.Command) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
@@ -220,6 +226,7 @@ func handleRepoLs(cmd *cobra.Command) error {
 	return nil
 }
 
+// handleRepoRm processes the `repo rm` workflow.
 func handleRepoRm(cmd *cobra.Command, selector string) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
@@ -272,6 +279,7 @@ func handleRepoRm(cmd *cobra.Command, selector string) error {
 	return nil
 }
 
+// resolveManifestSource normalises manifest references to canonical paths.
 func resolveManifestSource(source string) (string, error) {
 	if isRemotePath(source) {
 		return source, nil
@@ -293,6 +301,7 @@ func resolveManifestSource(source string) (string, error) {
 	return abs, nil
 }
 
+// displayValue returns a printable value for tabular output.
 func displayValue(val string) string {
 	if strings.TrimSpace(val) == "" {
 		return "-"
@@ -300,6 +309,7 @@ func displayValue(val string) string {
 	return val
 }
 
+// formatUpdatedAt renders a timestamp suitable for CLI output.
 func formatUpdatedAt(t time.Time) string {
 	if t.IsZero() {
 		return "-"
@@ -307,6 +317,7 @@ func formatUpdatedAt(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
+// removeRegistryEntry removes a manifest by ID or source value.
 func removeRegistryEntry(store *registry.Store, selector string) (registry.Entry, bool) {
 	if selector == "" {
 		return registry.Entry{}, false
