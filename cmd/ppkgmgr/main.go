@@ -36,10 +36,10 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 	}
 
 	switch args[0] {
-	case "version":
+	case "ver":
 		return runVersion(args[1:], stdout, stderr)
-	case "act":
-		return runAct(args[1:], stdout, stderr, downloader)
+	case "dl":
+		return runDownload(args[1:], stdout, stderr, downloader)
 	default:
 		fmt.Fprintf(stderr, "unknown subcommand: %s\n", args[0])
 		return 1
@@ -47,7 +47,7 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 }
 
 func runVersion(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("version", flag.ContinueOnError)
+	fs := flag.NewFlagSet("ver", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -60,11 +60,11 @@ func runVersion(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func runAct(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
-	fs := flag.NewFlagSet("act", flag.ContinueOnError)
+func runDownload(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
+	fs := flag.NewFlagSet("dl", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var spider bool
-	fs.BoolVar(&spider, "spider", false, "no act")
+	fs.BoolVar(&spider, "spider", false, "no dl")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
