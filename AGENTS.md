@@ -32,9 +32,7 @@ We follow the **Standard Go Project Layout**.
 ├─ internal/              # Non-exported packages
 ├─ pkg/                   # Reusable public logic
 ├─ test/                  # Test fixtures
-├─ scripts/               # Installation helper scripts
 ├─ bin/                   # Build artifacts (generated; not tracked by Git)
-├─ build/                 # Release artifacts
 ├─ Makefile               # Build / test / release tasks
 └─ docs/                  # Documentation
 ```
@@ -244,4 +242,3 @@ Template example:
 * [ ] `make lint`
 * [ ] `make test`
 * [ ] `make build`
-
