@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"ppkgmgr/internal/registry"
+
 	"github.com/zeebo/blake3"
 )
 
@@ -47,6 +49,28 @@ func TestRun_RequireSubcommand(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "require subcommand") {
 		t.Fatalf("expected require subcommand message, got %q", stderr.String())
+	}
+}
+
+func TestRunPkg_RequireSubcommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"pkg"}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "require pkg subcommand") {
+		t.Fatalf("expected pkg subcommand message, got %q", stderr.String())
+	}
+}
+
+func TestRunPkgAdd_RequireArgument(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"pkg", "add"}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "require manifest path or URL argument") {
+		t.Fatalf("expected manifest argument message, got %q", stderr.String())
 	}
 }
 
@@ -290,5 +314,54 @@ func TestRun_DownloadDigestMismatch(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "warning: digest mismatch") {
 		t.Fatalf("expected digest mismatch warning, got %q", stderr.String())
+	}
+}
+
+func TestRunPkgAdd_Success(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	manifest := filepath.Join(dir, "manifest.yml")
+	content := "repositories: []\n"
+	if err := os.WriteFile(manifest, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"pkg", "add", manifest}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+
+	registryPath := filepath.Join(home, "registry.json")
+	store, err := registry.Load(registryPath)
+	if err != nil {
+		t.Fatalf("failed to load registry: %v", err)
+	}
+
+	if len(store.Entries) != 1 {
+		t.Fatalf("expected 1 registry entry, got %d", len(store.Entries))
+	}
+
+	entry := store.Entries[0]
+	if entry.Source != manifest {
+		t.Fatalf("expected source %q, got %q", manifest, entry.Source)
+	}
+	if entry.LocalPath == "" {
+		t.Fatalf("expected local path to be recorded")
+	}
+	data, err := os.ReadFile(entry.LocalPath)
+	if err != nil {
+		t.Fatalf("failed to read stored manifest: %v", err)
+	}
+	if string(data) != content {
+		t.Fatalf("unexpected stored manifest content: %q", string(data))
+	}
+	if entry.Digest == "" {
+		t.Fatalf("expected digest to be recorded")
+	}
+	if !strings.Contains(stdout.String(), "registered manifest") {
+		t.Fatalf("expected success message in stdout, got %q", stdout.String())
 	}
 }

@@ -9,8 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"ppkgmgr/internal/data"
+	"ppkgmgr/internal/registry"
 	"ppkgmgr/pkg/req"
 
 	"github.com/zeebo/blake3"
@@ -40,6 +42,8 @@ func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
 		return runVersion(args[1:], stdout, stderr)
 	case "dl":
 		return runDownload(args[1:], stdout, stderr, downloader)
+	case "pkg":
+		return runPkg(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown subcommand: %s\n", args[0])
 		return 1
@@ -136,9 +140,108 @@ func runDownload(args []string, stdout, stderr io.Writer, downloader downloadFun
 	return 0
 }
 
+func runPkg(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "require pkg subcommand")
+		return 1
+	}
+
+	switch args[0] {
+	case "add":
+		return runPkgAdd(args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown pkg subcommand: %s\n", args[0])
+		return 1
+	}
+}
+
+func runPkgAdd(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("pkg add", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	paths := fs.Args()
+	if len(paths) != 1 {
+		fmt.Fprintln(stderr, "require manifest path or URL argument")
+		return 1
+	}
+	source := paths[0]
+
+	raw, err := data.LoadRaw(source)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to load manifest: %v\n", err)
+		return 3
+	}
+
+	root, err := storageDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine storage directory: %v\n", err)
+		return 5
+	}
+
+	manifestDir := filepath.Join(root, "manifests")
+	if err := os.MkdirAll(manifestDir, 0o755); err != nil {
+		fmt.Fprintf(stderr, "failed to prepare manifest directory: %v\n", err)
+		return 5
+	}
+
+	target := filepath.Join(manifestDir, backupFileName(source))
+	if err := os.WriteFile(target, raw, 0o600); err != nil {
+		fmt.Fprintf(stderr, "failed to write backup: %v\n", err)
+		return 5
+	}
+
+	_, digest, err := verifyDigest(target, "")
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to compute digest: %v\n", err)
+		return 5
+	}
+
+	registryPath := filepath.Join(root, "registry.json")
+	store, err := registry.Load(registryPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to load registry: %v\n", err)
+		return 5
+	}
+
+	entryID := generateEntryID(source)
+	if existing, ok := store.GetBySource(source); ok && existing.ID != "" {
+		entryID = existing.ID
+	}
+
+	store.Upsert(registry.Entry{
+		ID:        entryID,
+		Source:    source,
+		LocalPath: target,
+		Digest:    digest,
+		AddedAt:   time.Now().UTC(),
+	})
+
+	if err := store.Save(registryPath); err != nil {
+		fmt.Fprintf(stderr, "failed to save registry: %v\n", err)
+		return 5
+	}
+
+	fmt.Fprintf(stdout, "registered manifest: %s\n", target)
+	return 0
+}
+
 func main() {
 	code := run(os.Args[1:], os.Stdout, os.Stderr, req.Download)
 	os.Exit(code)
+}
+
+func storageDir() (string, error) {
+	if override := os.Getenv("PPKGMGR_HOME"); override != "" {
+		return override, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("get user home: %w", err)
+	}
+	return filepath.Join(home, ".ppkgmgr"), nil
 }
 
 func isRemotePath(path string) bool {
@@ -172,4 +275,39 @@ func verifyDigest(path, expected string) (bool, string, error) {
 	}
 
 	return strings.EqualFold(expected, actualHex), actualHex, nil
+}
+
+func backupFileName(source string) string {
+	base := filepath.Base(source)
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		base = "manifest.yml"
+	}
+	base = sanitizeFileName(base)
+	sum := blake3.Sum256([]byte(source))
+	prefix := hex.EncodeToString(sum[:4])
+	return fmt.Sprintf("%s_%s", prefix, base)
+}
+
+func sanitizeFileName(name string) string {
+	var builder strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			strings.ContainsRune("._-", r) {
+			builder.WriteRune(r)
+			continue
+		}
+		builder.WriteRune('_')
+	}
+	result := builder.String()
+	if result == "" {
+		return "manifest.yml"
+	}
+	return result
+}
+
+func generateEntryID(source string) string {
+	sum := blake3.Sum256([]byte(source))
+	return hex.EncodeToString(sum[:8])
 }
