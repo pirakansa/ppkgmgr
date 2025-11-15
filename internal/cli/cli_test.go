@@ -545,3 +545,128 @@ func TestRunRepoRm_NotFound(t *testing.T) {
 		t.Fatalf("expected missing message, got %q", stderr.String())
 	}
 }
+
+func TestRunPkg_RequireSubcommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg"}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "require pkg subcommand") {
+		t.Fatalf("expected pkg subcommand message, got %q", stderr.String())
+	}
+}
+
+func TestRunPkgUp_NoEntries(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "up"}, &stdout, &stderr, func(string, string) (int64, error) {
+		return 0, nil
+	})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "no manifests registered") {
+		t.Fatalf("expected no manifests message, got %q", stdout.String())
+	}
+}
+
+func TestRunPkgUp_RefreshAndDownload(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	sourceManifest := filepath.Join(dir, "source.yml")
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	newContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n", outDir)
+	if err := os.WriteFile(sourceManifest, []byte(newContent), 0o644); err != nil {
+		t.Fatalf("failed to write source manifest: %v", err)
+	}
+
+	manifestPath := filepath.Join(home, "manifests", "cached.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifest dir: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, []byte("repositories: []\n"), 0o600); err != nil {
+		t.Fatalf("failed to write cached manifest: %v", err)
+	}
+
+	store := registry.Store{
+		Entries: []registry.Entry{
+			{
+				ID:        "entry",
+				Source:    sourceManifest,
+				LocalPath: manifestPath,
+				Digest:    "old",
+				AddedAt:   time.Now().UTC(),
+			},
+		},
+	}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to seed registry: %v", err)
+	}
+
+	downloadedPath := filepath.Join(outDir, "tool.bin")
+	var downloaded bool
+	downloader := func(url, path string) (int64, error) {
+		if url != "https://example.com/tool.bin" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != downloadedPath {
+			t.Fatalf("unexpected download path %q", path)
+		}
+		if err := os.WriteFile(path, []byte("tool-data"), 0o644); err != nil {
+			return 0, err
+		}
+		downloaded = true
+		return 9, nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "up"}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if !downloaded {
+		t.Fatalf("expected download to run")
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatalf("failed to read manifest: %v", err)
+	}
+	if string(data) != newContent {
+		t.Fatalf("expected manifest to be refreshed, got %q", string(data))
+	}
+	if _, err := os.Stat(downloadedPath); err != nil {
+		t.Fatalf("expected downloaded file to exist: %v", err)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	updatedStore, err := registry.Load(registryPath)
+	if err != nil {
+		t.Fatalf("failed to reload registry: %v", err)
+	}
+	if len(updatedStore.Entries) != 1 {
+		t.Fatalf("expected single registry entry, got %d", len(updatedStore.Entries))
+	}
+	expectedDigest := updatedStore.Entries[0].Digest
+	match, actual, err := verifyDigest(manifestPath, expectedDigest)
+	if err != nil {
+		t.Fatalf("failed to verify digest: %v", err)
+	}
+	if !match {
+		t.Fatalf("expected digest %s to match actual %s", expectedDigest, actual)
+	}
+	if !strings.Contains(stdout.String(), "updated files for") {
+		t.Fatalf("expected success message, got %q", stdout.String())
+	}
+}

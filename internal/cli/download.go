@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,55 +45,63 @@ func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
 				return cliError{code: 3}
 			}
 
-			var downloadErr error
-			for _, repo := range fd.Repo {
-				for _, fs := range repo.Files {
-					dlurl := fmt.Sprintf("%s/%s", repo.Url, fs.FileName)
-					outdir := defaultData(fs.OutDir, ".")
-					expandedDir, err := expandPath(outdir)
-					if err != nil {
-						fmt.Fprintf(stderr, "failed to expand output directory %q: %v\n", outdir, err)
-						return cliError{code: 3}
-					}
-					outdir = expandedDir
-					outname := defaultData(fs.Rename, fs.FileName)
-					if filepath.IsAbs(outname) {
-						outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
-						outname = strings.TrimLeft(outname, "/\\")
-					}
-					dlpath := filepath.Join(outdir, outname)
-					if spider {
-						fmt.Fprintf(stdout, "%s   %s\n", dlurl, dlpath)
-						continue
-					}
-
-					if _, err := downloader(dlurl, dlpath); err != nil {
-						fmt.Fprintf(stderr, "failed to download %s: %v\n", dlurl, err)
-						downloadErr = err
-						continue
-					}
-
-					if fs.Digest != "" {
-						match, actual, err := verifyDigest(dlpath, fs.Digest)
-						if err != nil {
-							fmt.Fprintf(stderr, "warning: failed to verify digest for %s: %v\n", dlpath, err)
-							continue
-						}
-						if !match {
-							fmt.Fprintf(stderr, "warning: digest mismatch for %s (expected %s, got %s)\n", dlpath, fs.Digest, actual)
-						}
-					}
-				}
-			}
-
-			if downloadErr != nil {
-				return cliError{code: 4}
-			}
-
-			return nil
+			return downloadManifestFiles(fd, downloader, stdout, stderr, spider)
 		},
 	}
 
 	cmd.Flags().BoolVar(&spider, "spider", false, "no dl")
 	return cmd
+}
+
+func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, stderr io.Writer, spider bool) error {
+	if downloader == nil && !spider {
+		fmt.Fprintln(stderr, "downloader is required")
+		return cliError{code: 5}
+	}
+
+	var downloadErr error
+	for _, repo := range fd.Repo {
+		for _, fs := range repo.Files {
+			dlurl := fmt.Sprintf("%s/%s", repo.Url, fs.FileName)
+			outdir := defaultData(fs.OutDir, ".")
+			expandedDir, err := expandPath(outdir)
+			if err != nil {
+				fmt.Fprintf(stderr, "failed to expand output directory %q: %v\n", outdir, err)
+				return cliError{code: 3}
+			}
+			outdir = expandedDir
+			outname := defaultData(fs.Rename, fs.FileName)
+			if filepath.IsAbs(outname) {
+				outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
+				outname = strings.TrimLeft(outname, "/\\")
+			}
+			dlpath := filepath.Join(outdir, outname)
+			if spider {
+				fmt.Fprintf(stdout, "%s   %s\n", dlurl, dlpath)
+				continue
+			}
+
+			if _, err := downloader(dlurl, dlpath); err != nil {
+				fmt.Fprintf(stderr, "failed to download %s: %v\n", dlurl, err)
+				downloadErr = err
+				continue
+			}
+
+			if fs.Digest != "" {
+				match, actual, err := verifyDigest(dlpath, fs.Digest)
+				if err != nil {
+					fmt.Fprintf(stderr, "warning: failed to verify digest for %s: %v\n", dlpath, err)
+					continue
+				}
+				if !match {
+					fmt.Fprintf(stderr, "warning: digest mismatch for %s (expected %s, got %s)\n", dlpath, fs.Digest, actual)
+				}
+			}
+		}
+	}
+
+	if downloadErr != nil {
+		return cliError{code: 4}
+	}
+	return nil
 }
