@@ -65,7 +65,7 @@ lint: vet staticcheck
 
 .PHONY: test
 test: lint
-	@go test $(GO_TAG_FLAGS) -v ./...
+	@go test -race $(GO_TAG_FLAGS) -v ./...
 
 .PHONY: clean
 clean:
