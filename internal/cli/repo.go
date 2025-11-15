@@ -211,11 +211,24 @@ func handleRepoRm(cmd *cobra.Command, selector string) error {
 		return cliError{code: 2}
 	}
 
+	var targets []manifestTarget
+	if entry.LocalPath != "" {
+		if manifestTargets, err := extractManifestTargets(entry.LocalPath); err == nil {
+			targets = manifestTargets
+		} else if !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stderr, "warning: failed to parse manifest %s: %v\n", displayValue(entry.Source), err)
+		}
+	}
+
 	if entry.LocalPath != "" {
 		if err := os.Remove(entry.LocalPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stderr, "failed to remove manifest file: %v\n", err)
 			return cliError{code: 5}
 		}
+	}
+
+	if len(targets) != 0 {
+		cleanupOldTargets(targets, stderr)
 	}
 
 	if err := store.Save(registryPath); err != nil {

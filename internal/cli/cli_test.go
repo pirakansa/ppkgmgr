@@ -546,6 +546,51 @@ func TestRunRepoRm_NotFound(t *testing.T) {
 	}
 }
 
+func TestRunRepoRm_RemovesDownloadedFiles(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	manifestPath := filepath.Join(home, "manifests", "abc.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifests dir: %v", err)
+	}
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.bin\n        out_dir: %s\n", outDir)
+	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+	downloadedFile := filepath.Join(outDir, "file.bin")
+	if err := os.WriteFile(downloadedFile, []byte("data"), 0o644); err != nil {
+		t.Fatalf("failed to write downloaded file: %v", err)
+	}
+
+	entry := registry.Entry{
+		ID:        "deadbeef",
+		Source:    "/tmp/source.yml",
+		LocalPath: manifestPath,
+		Digest:    "digest",
+		UpdatedAt: time.Now().UTC(),
+	}
+	store := registry.Store{Entries: []registry.Entry{entry}}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"repo", "rm", entry.ID}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if _, err := os.Stat(downloadedFile); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected downloaded file to be removed, err=%v", err)
+	}
+}
+
 func TestRunPkg_RequireSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	exitCode := Run([]string{"pkg"}, &stdout, &stderr, nil)
