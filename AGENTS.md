@@ -13,12 +13,13 @@ This document is the **README for AI coding agents**. It complements the human-f
 
 ---
 
-## 2. Build & Run
+## 2. Build & Validate
 
 * Build: `make build`
 * Test: `make test`
-* Run during development: `make run`
+* Lint: `make lint`
 * Cleanup: remove build artifacts (such as `./bin/`) with `rm -rf ./bin/` (equivalent to `make clean`).
+* For CLI usage and command examples, see the Usage section in README.md.
 
 ---
 
