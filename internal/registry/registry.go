@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Entry tracks metadata about a stored manifest.
 type Entry struct {
 	ID        string    `json:"id"`
 	Source    string    `json:"source"`
@@ -18,10 +19,12 @@ type Entry struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// Store contains all registry entries persisted on disk.
 type Store struct {
 	Entries []Entry `json:"entries"`
 }
 
+// Load reads registry metadata from the provided path.
 func Load(path string) (Store, error) {
 	var store Store
 
@@ -44,6 +47,7 @@ func Load(path string) (Store, error) {
 	return store, nil
 }
 
+// Save writes the registry metadata to disk in a stable order.
 func (s Store) Save(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create registry dir: %w", err)
@@ -66,6 +70,7 @@ func (s Store) Save(path string) error {
 	return nil
 }
 
+// Upsert inserts or replaces a registry entry by source.
 func (s *Store) Upsert(entry Entry) {
 	for i, existing := range s.Entries {
 		if existing.Source == entry.Source {
@@ -82,6 +87,7 @@ func (s *Store) Upsert(entry Entry) {
 	s.Entries = append(s.Entries, entry)
 }
 
+// GetBySource finds an entry by its source identifier.
 func (s *Store) GetBySource(source string) (Entry, bool) {
 	for _, entry := range s.Entries {
 		if entry.Source == source {
@@ -91,6 +97,7 @@ func (s *Store) GetBySource(source string) (Entry, bool) {
 	return Entry{}, false
 }
 
+// RemoveByID deletes an entry matching the ID and returns it when found.
 func (s *Store) RemoveByID(id string) (Entry, bool) {
 	for i, entry := range s.Entries {
 		if entry.ID == id {
@@ -101,6 +108,7 @@ func (s *Store) RemoveByID(id string) (Entry, bool) {
 	return Entry{}, false
 }
 
+// RemoveBySource deletes an entry matching the source and returns it when found.
 func (s *Store) RemoveBySource(source string) (Entry, bool) {
 	for i, entry := range s.Entries {
 		if entry.Source == source {

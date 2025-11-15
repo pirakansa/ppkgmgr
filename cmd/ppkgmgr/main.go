@@ -1,3 +1,4 @@
+// Binary main package for the ppkgmgr command-line application.
 package main
 
 import (
@@ -7,6 +8,7 @@ import (
 	"ppkgmgr/pkg/req"
 )
 
+// Version reports the build-time version string injected by ldflags.
 var (
 	Version = "0.0.0"
 )

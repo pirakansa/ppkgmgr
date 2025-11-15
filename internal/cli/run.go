@@ -5,6 +5,8 @@ import (
 	"io"
 )
 
+// DownloadFunc downloads the remote file at the first argument into the
+// location provided by the second argument.
 type DownloadFunc func(string, string) (int64, error)
 
 type cliError struct {
@@ -15,6 +17,8 @@ func (e cliError) Error() string {
 	return "cli error"
 }
 
+// Run executes the ppkgmgr CLI with the provided arguments and writers,
+// returning the process exit code.
 func Run(args []string, stdout, stderr io.Writer, downloader DownloadFunc) int {
 	root := newRootCmd(downloader)
 	root.SetOut(stdout)

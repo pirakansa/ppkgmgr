@@ -6,8 +6,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version is set by the main package prior to executing the CLI.
 var Version = "0.0.0"
 
+// newVersionCmd reports CLI version details.
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "ver",
