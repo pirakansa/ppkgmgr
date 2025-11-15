@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newDownloadCmd(downloader downloadFunc) *cobra.Command {
+func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
 	var spider bool
 
 	cmd := &cobra.Command{

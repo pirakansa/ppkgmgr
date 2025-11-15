@@ -1,10 +1,12 @@
-package main
+package cli
 
 import (
 	"fmt"
 
 	"github.com/spf13/cobra"
 )
+
+var Version = "0.0.0"
 
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{

@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRootCmd(downloader downloadFunc) *cobra.Command {
+func newRootCmd(downloader DownloadFunc) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "ppkgmgr",
 		Short:         "Private package manager CLI",
