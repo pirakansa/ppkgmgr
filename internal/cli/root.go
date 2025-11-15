@@ -19,7 +19,7 @@ func newRootCmd(downloader DownloadFunc) *cobra.Command {
 	}
 
 	cmd.AddCommand(newDownloadCmd(downloader))
-	cmd.AddCommand(newPkgCmd())
+	cmd.AddCommand(newRepoCmd())
 	cmd.AddCommand(newVersionCmd())
 	return cmd
 }

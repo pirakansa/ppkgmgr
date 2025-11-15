@@ -83,20 +83,20 @@ func TestRun_Help(t *testing.T) {
 	}
 }
 
-func TestRunPkg_RequireSubcommand(t *testing.T) {
+func TestRunRepo_RequireSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg"}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"repo"}, &stdout, &stderr, nil)
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
-	if !strings.Contains(stderr.String(), "require pkg subcommand") {
-		t.Fatalf("expected pkg subcommand message, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "require repo subcommand") {
+		t.Fatalf("expected repo subcommand message, got %q", stderr.String())
 	}
 }
 
-func TestRunPkgAdd_RequireArgument(t *testing.T) {
+func TestRunRepoAdd_RequireArgument(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg", "add"}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"repo", "add"}, &stdout, &stderr, nil)
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
@@ -373,7 +373,7 @@ func TestRun_DownloadDigestMismatch(t *testing.T) {
 	}
 }
 
-func TestRunPkgAdd_Success(t *testing.T) {
+func TestRunRepoAdd_Success(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
 	t.Setenv("PPKGMGR_HOME", home)
@@ -385,7 +385,7 @@ func TestRunPkgAdd_Success(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg", "add", manifest}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"repo", "add", manifest}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
 	}
@@ -422,13 +422,13 @@ func TestRunPkgAdd_Success(t *testing.T) {
 	}
 }
 
-func TestRunPkgLs_NoEntries(t *testing.T) {
+func TestRunRepoLs_NoEntries(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
 	t.Setenv("PPKGMGR_HOME", home)
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg", "ls"}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"repo", "ls"}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
 	}
@@ -437,7 +437,7 @@ func TestRunPkgLs_NoEntries(t *testing.T) {
 	}
 }
 
-func TestRunPkgLs_ListEntries(t *testing.T) {
+func TestRunRepoLs_ListEntries(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
 	t.Setenv("PPKGMGR_HOME", home)
@@ -466,7 +466,7 @@ func TestRunPkgLs_ListEntries(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg", "ls"}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"repo", "ls"}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
 	}
@@ -485,7 +485,7 @@ func TestRunPkgLs_ListEntries(t *testing.T) {
 	}
 }
 
-func TestRunPkgRm_ByID(t *testing.T) {
+func TestRunRepoRm_ByID(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
 	t.Setenv("PPKGMGR_HOME", home)
@@ -512,7 +512,7 @@ func TestRunPkgRm_ByID(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg", "rm", entry.ID}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"repo", "rm", entry.ID}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
 	}
@@ -531,13 +531,13 @@ func TestRunPkgRm_ByID(t *testing.T) {
 	}
 }
 
-func TestRunPkgRm_NotFound(t *testing.T) {
+func TestRunRepoRm_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
 	t.Setenv("PPKGMGR_HOME", home)
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg", "rm", "missing"}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"repo", "rm", "missing"}, &stdout, &stderr, nil)
 	if exitCode != 2 {
 		t.Fatalf("expected exit code 2, got %d", exitCode)
 	}

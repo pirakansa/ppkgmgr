@@ -16,23 +16,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newPkgCmd() *cobra.Command {
+func newRepoCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "pkg",
+		Use:   "repo",
 		Short: "Manage stored manifests",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.ErrOrStderr(), "require pkg subcommand")
+			fmt.Fprintln(cmd.ErrOrStderr(), "require repo subcommand")
 			return cliError{code: 1}
 		},
 	}
 
-	cmd.AddCommand(newPkgAddCmd())
-	cmd.AddCommand(newPkgLsCmd())
-	cmd.AddCommand(newPkgRmCmd())
+	cmd.AddCommand(newRepoAddCmd())
+	cmd.AddCommand(newRepoLsCmd())
+	cmd.AddCommand(newRepoRmCmd())
 	return cmd
 }
 
-func newPkgAddCmd() *cobra.Command {
+func newRepoAddCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "add <manifest>",
 		Short: "Register a manifest locally",
@@ -41,26 +41,26 @@ func newPkgAddCmd() *cobra.Command {
 				fmt.Fprintln(cmd.ErrOrStderr(), "require manifest path or URL argument")
 				return cliError{code: 1}
 			}
-			return handlePkgAdd(cmd, args[0])
+			return handleRepoAdd(cmd, args[0])
 		},
 	}
 }
 
-func newPkgLsCmd() *cobra.Command {
+func newRepoLsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "ls",
 		Short: "List registered manifests",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "pkg ls does not accept arguments")
+				fmt.Fprintln(cmd.ErrOrStderr(), "repo ls does not accept arguments")
 				return cliError{code: 1}
 			}
-			return handlePkgLs(cmd)
+			return handleRepoLs(cmd)
 		},
 	}
 }
 
-func newPkgRmCmd() *cobra.Command {
+func newRepoRmCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rm <id_or_source>",
 		Short: "Remove a registered manifest",
@@ -69,12 +69,12 @@ func newPkgRmCmd() *cobra.Command {
 				fmt.Fprintln(cmd.ErrOrStderr(), "require manifest ID or source argument")
 				return cliError{code: 1}
 			}
-			return handlePkgRm(cmd, args[0])
+			return handleRepoRm(cmd, args[0])
 		},
 	}
 }
 
-func handlePkgAdd(cmd *cobra.Command, source string) error {
+func handleRepoAdd(cmd *cobra.Command, source string) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
@@ -137,7 +137,7 @@ func handlePkgAdd(cmd *cobra.Command, source string) error {
 	return nil
 }
 
-func handlePkgLs(cmd *cobra.Command) error {
+func handleRepoLs(cmd *cobra.Command) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
@@ -183,7 +183,7 @@ func handlePkgLs(cmd *cobra.Command) error {
 	return nil
 }
 
-func handlePkgRm(cmd *cobra.Command, selector string) error {
+func handleRepoRm(cmd *cobra.Command, selector string) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
