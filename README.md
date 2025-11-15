@@ -11,10 +11,19 @@
 
 ### Command Examples
 ```sh
-$ ppkgmgr -f <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
-$ ppkgmgr --spider -f <path_or_url_to_yaml>  # Preview download URLs and paths
-$ ppkgmgr -v  # Display version information
+$ ppkgmgr help  # Display available subcommands and usage
+$ ppkgmgr dl <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
+$ ppkgmgr dl --spider <path_or_url_to_yaml>  # Preview download URLs and paths
+$ ppkgmgr repo add <path_or_url_to_yaml>  # Backup the manifest under ~/.ppkgmgr for later use
+$ ppkgmgr repo ls  # Show registered manifests stored locally
+$ ppkgmgr repo rm <id_or_source>  # Remove a stored manifest by ID or source URL/path
+$ ppkgmgr pkg up  # Refresh stored manifests under ~/.ppkgmgr and redownload their files
+$ ppkgmgr ver  # Display version information
 ```
+
+`repo add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. Use `repo ls` to inspect saved manifests and `repo rm` when you want to delete an entry. This registry will later be used by commands such as `repo fetch` to detect changes.
+
+`pkg up` reads the stored manifests under `~/.ppkgmgr`, refreshes them from their original sources when possible, and downloads all referenced files so local copies stay up to date. When the refreshed manifest has the same digest as the stored copy, downloads are skipped to avoid unnecessary work.
 
 ## YAML Files
 
@@ -30,6 +39,7 @@ repositories:
     files:
       -
         file_name: <name of the file to download>
+        digest: <optional BLAKE3 digest to verify the file>
         out_dir: <output directory for the file>
         rename: <optional new name for the file>
 ```
@@ -37,6 +47,8 @@ repositories:
 ### Example YAML File
 
 For an example YAML file, refer to [testdata.yml](./test/data/testdata.yml).
+
+You can embed environment variables into `out_dir`. For example, `out_dir: $HOME/.local/bin` downloads files under `~/.local/bin` in your home directory.
 
 ## Development
 

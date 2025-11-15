@@ -31,7 +31,7 @@ type File struct {
 func Parse(path string) (FileData, error) {
 	var fd FileData
 
-	raw, err := loadYAML(path)
+	raw, err := LoadRaw(path)
 	if err != nil {
 		return fd, err
 	}
@@ -53,6 +53,10 @@ func loadYAML(path string) ([]byte, error) {
 		return nil, fmt.Errorf("read file: %w", err)
 	}
 	return raw, nil
+}
+
+func LoadRaw(path string) ([]byte, error) {
+	return loadYAML(path)
 }
 
 func isRemotePath(path string) bool {

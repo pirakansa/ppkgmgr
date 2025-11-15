@@ -25,8 +25,11 @@ jobs:
       run: |
         go install honnef.co/go/tools/cmd/staticcheck@latest
 
-    - name: Build
-      run: make build
+    - name: Lint
+      run: make lint
 
     - name: Test
       run: make test
+
+    - name: Build
+      run: make build

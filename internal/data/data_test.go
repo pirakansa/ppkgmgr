@@ -3,6 +3,7 @@ package data
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -64,13 +65,27 @@ func TestParseInvalidYAML(t *testing.T) {
 	}
 }
 
+func newIPv4Server(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip: failed to listen on loopback: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: listener,
+		Config:   &http.Server{Handler: handler},
+	}
+	server.Start()
+	t.Cleanup(server.Close)
+	return server
+}
+
 func TestParseRemoteSuccess(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newIPv4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-yaml")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "repositories:\n  - url: https://example.com\n    files:\n      - file_name: remote.txt\n        out_dir: ./remote\n")
 	}))
-	t.Cleanup(server.Close)
 
 	fd, err := Parse(server.URL + "/config.yml")
 	if err != nil {
@@ -93,10 +108,9 @@ func TestParseRemoteSuccess(t *testing.T) {
 }
 
 func TestParseRemoteUnexpectedStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newIPv4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 	}))
-	t.Cleanup(server.Close)
 
 	_, err := Parse(server.URL + "/missing.yml")
 	if err == nil {

@@ -13,12 +13,13 @@ This document is the **README for AI coding agents**. It complements the human-f
 
 ---
 
-## 2. Build & Run
+## 2. Build & Validate
 
-* Build: `go build -o ./bin/host/ ./cmd/<name>`
-* Test: `go test -v ./...`
-* Run during development: `go run ./cmd/<name>`
+* Build: `make build`
+* Test: `make test`
+* Lint: `make lint`
 * Cleanup: remove build artifacts (such as `./bin/`) with `rm -rf ./bin/` (equivalent to `make clean`).
+* For CLI usage and command examples, see the Usage section in README.md.
 
 ---
 
@@ -32,9 +33,7 @@ We follow the **Standard Go Project Layout**.
 ├─ internal/              # Non-exported packages
 ├─ pkg/                   # Reusable public logic
 ├─ test/                  # Test fixtures
-├─ scripts/               # Installation helper scripts
 ├─ bin/                   # Build artifacts (generated; not tracked by Git)
-├─ build/                 # Release artifacts
 ├─ Makefile               # Build / test / release tasks
 └─ docs/                  # Documentation
 ```
@@ -49,15 +48,16 @@ We follow the **Standard Go Project Layout**.
 ### Agent-Specific Rules
 
 * Place new files according to the directory guidelines above; avoid introducing unnecessary top-level directories.
-* When modifying existing functions, add or update unit tests and confirm `go test ./...` passes.
+* When modifying existing functions, add or update unit tests and confirm `make test` passes.
 * When writing files or accessing external resources, use temporary directories so existing test data is not overwritten.
+
 
 ---
 
 ## 4. Coding Standards
 
-* Always run `staticcheck ./...` so the code remains `staticcheck`-formatted.
-* Run `go vet ./...` for static checks and ensure there are no warnings (CI requirement).
+* Always run `make staticcheck` so the code remains `staticcheck`-formatted.
+* Run `make lint` for static checks and ensure there are no warnings (CI requirement).
 * Handle errors by returning `error`; do not silently discard them with `fmt.Println`. Prefer `fmt.Fprintf(os.Stderr, ...)` for user-facing messages.
 * Package names must be lowercase words (no snake_case). Exported identifiers use UpperCamelCase.
 * Extract magic numbers and hard-coded URLs into constants with meaningful names within the module.
@@ -67,16 +67,15 @@ We follow the **Standard Go Project Layout**.
 
 ## 5. Testing & Verification
 
-* Unit tests: `go test ./...`
-* Race detection: run `go test -race ./...` when concurrency issues are suspected.
+* Unit tests: `make test`
 * For additional file or network operations, use temp directories or `httptest` to avoid external dependencies.
 * When command behavior changes, keep usage examples in `README.md` and fixtures under `test` consistent.
 
 ### Static Analysis / Lint / Vulnerability Scanning
 
-* Static analysis: `go vet ./...`
-* Code quality: `staticcheck ./...`
-* Vulnerability scanning: `govulncheck ./...`
+* Static analysis: `make staticcheck`
+* Code quality: `make vet`
+* Vulnerability scanning: `make govulncheck`
 
 ---
 
@@ -84,10 +83,11 @@ We follow the **Standard Go Project Layout**.
 
 GitHub Actions (`.github/workflows/go.yml`) runs the following:
 
-* `make build`
+* `make lint`
 * `make test`
+* `make build`
 
-Confirm `make build` / `make test` succeed locally before opening a PR. If they fail, format and validate locally, then rerun.
+Confirm `make lint` / `make test` / `make build` succeed locally before opening a PR. If they fail, format and validate locally, then rerun.
 
 ---
 
@@ -104,7 +104,8 @@ Confirm `make build` / `make test` succeed locally before opening a PR. If they 
 
 * If multiple `AGENTS.md` files exist, reference the one closest to your working directory (this repository only has the top-level file).
 * When instructions conflict, prioritize explicit user prompts and clarify any uncertainties.
-* Before and after your work, confirm `go build -o ./bin/host/ ./cmd/<name>` and `go test ./...` succeed. If they fail, report the cause and mitigation (the Makefile `build` / `test` targets wrap these commands).
+* Before and after your work, ensure `make lint`, `make test`, and `make build` all succeed; report the cause and fix if any of them fail.
+
 
 ---
 
@@ -182,7 +183,7 @@ type(scope?): description
 * Add dependencies with `go get <module>@<version>` and keep `go.mod` / `go.sum` in sync.
 * Remove unused dependencies with `go mod tidy`.
 * For dependency updates, state the target module and reason in the PR body.
-* Check external dependencies with `govulncheck ./...` and report as needed.
+* Check external dependencies with `make govulncheck` and report as needed.
 
 ---
 
@@ -243,4 +244,3 @@ Template example:
 * [ ] `make lint`
 * [ ] `make test`
 * [ ] `make build`
-
