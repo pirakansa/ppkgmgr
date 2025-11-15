@@ -18,23 +18,51 @@ func TestParseSuccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(fd.Repo) != 2 {
-		t.Fatalf("expected 2 repositories, got %d", len(fd.Repo))
+	if len(fd.Repo) != 3 {
+		t.Fatalf("expected 3 repositories, got %d", len(fd.Repo))
 	}
 
 	first := fd.Repo[0]
-	if first.Comment != "jpeg" {
+	if first.Comment != "test1" {
 		t.Fatalf("unexpected comment: %q", first.Comment)
 	}
-	if first.Url != "https://picsum.photos/200" {
+	if first.Url != "https://example.com/" {
 		t.Fatalf("unexpected url: %q", first.Url)
 	}
-	if len(first.Files) != 2 {
-		t.Fatalf("expected 2 files, got %d", len(first.Files))
+	if len(first.Files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(first.Files))
 	}
 	file := first.Files[0]
-	if file.FileName != "200.jpg" || file.OutDir != "./photos" || file.Rename != "" || file.Digest != "" {
+	if file.FileName != "index.html" || file.OutDir != "./tmp.test" || file.Rename != "" || file.Digest != "" {
 		t.Fatalf("unexpected file data: %+v", file)
+	}
+
+	second := fd.Repo[1]
+	if second.Comment != "test2" || second.Url != "https://example.com/" {
+		t.Fatalf("unexpected repo data: %+v", second)
+	}
+	if len(second.Files) != 2 {
+		t.Fatalf("expected 2 files for second repo, got %d", len(second.Files))
+	}
+	file = second.Files[0]
+	if file.FileName != "index.html" || file.Rename != "inde1.html" || file.OutDir != "./tmp.test" {
+		t.Fatalf("unexpected first file data in second repo: %+v", file)
+	}
+	if file.Digest != "454499efc25b742a1eaa37e1b2ec934638b05cef87b036235c087d54ee5dde59" {
+		t.Fatalf("unexpected digest in first file of second repo: %q", file.Digest)
+	}
+	file = second.Files[1]
+	if file.Rename != "index2.html" || file.Digest != strings.Repeat("f", 64) {
+		t.Fatalf("unexpected second file data in second repo: %+v", file)
+	}
+
+	third := fd.Repo[2]
+	if third.Comment != "test3" || len(third.Files) != 1 {
+		t.Fatalf("unexpected third repo data: %+v", third)
+	}
+	file = third.Files[0]
+	if file.Rename != "index0.html" || file.FileName != "index.html" || file.OutDir != "./tmp.test" {
+		t.Fatalf("unexpected file data in third repo: %+v", file)
 	}
 }
 
