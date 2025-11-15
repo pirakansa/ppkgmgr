@@ -54,7 +54,7 @@ vet:
 
 .PHONY: staticcheck
 staticcheck:
-	@GOFLAGS='-tags=$(GO_TAGS)' staticcheck ./...
+	@staticcheck ./...
 
 .PHONY: govulncheck
 govulncheck:
