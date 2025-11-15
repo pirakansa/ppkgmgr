@@ -1,4 +1,4 @@
-FROM golang:1-bullseye
+FROM golang:1.24-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \

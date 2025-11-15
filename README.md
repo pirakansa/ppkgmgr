@@ -5,7 +5,6 @@
 ## Features
 - Parse YAML files to retrieve repository information.
 - Download files via HTTP.
-- Use `spider` mode to preview download URLs and paths.
 
 ## Usage
 
