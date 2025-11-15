@@ -15,10 +15,12 @@ $ ppkgmgr help  # Display available subcommands and usage
 $ ppkgmgr dl <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
 $ ppkgmgr dl --spider <path_or_url_to_yaml>  # Preview download URLs and paths
 $ ppkgmgr pkg add <path_or_url_to_yaml>  # Backup the manifest under ~/.ppkgmgr for later use
+$ ppkgmgr pkg ls  # Show registered manifests stored locally
+$ ppkgmgr pkg rm <id_or_source>  # Remove a stored manifest by ID or source URL/path
 $ ppkgmgr ver  # Display version information
 ```
 
-`pkg add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. This registry will later be used by commands such as `pkg fetch` to detect changes.
+`pkg add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. Use `pkg ls` to inspect saved manifests and `pkg rm` when you want to delete an entry. This registry will later be used by commands such as `pkg fetch` to detect changes.
 
 ## YAML Files
 

@@ -87,3 +87,23 @@ func (s *Store) GetBySource(source string) (Entry, bool) {
 	}
 	return Entry{}, false
 }
+
+func (s *Store) RemoveByID(id string) (Entry, bool) {
+	for i, entry := range s.Entries {
+		if entry.ID == id {
+			s.Entries = append(s.Entries[:i], s.Entries[i+1:]...)
+			return entry, true
+		}
+	}
+	return Entry{}, false
+}
+
+func (s *Store) RemoveBySource(source string) (Entry, bool) {
+	for i, entry := range s.Entries {
+		if entry.Source == source {
+			s.Entries = append(s.Entries[:i], s.Entries[i+1:]...)
+			return entry, true
+		}
+	}
+	return Entry{}, false
+}

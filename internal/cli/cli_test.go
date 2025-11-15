@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"ppkgmgr/internal/registry"
 
@@ -418,5 +419,129 @@ func TestRunPkgAdd_Success(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "registered manifest") {
 		t.Fatalf("expected success message in stdout, got %q", stdout.String())
+	}
+}
+
+func TestRunPkgLs_NoEntries(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "ls"}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "no manifests registered") {
+		t.Fatalf("expected empty registry message, got %q", stdout.String())
+	}
+}
+
+func TestRunPkgLs_ListEntries(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	registryPath := filepath.Join(home, "registry.json")
+	entries := registry.Store{
+		Entries: []registry.Entry{
+			{
+				ID:        "aaaa1111",
+				Source:    "https://example.com/a.yml",
+				LocalPath: filepath.Join(home, "manifests", "a.yml"),
+				Digest:    "digest-a",
+				AddedAt:   time.Now().UTC().Add(-time.Hour),
+			},
+			{
+				ID:        "bbbb2222",
+				Source:    "https://example.com/b.yml",
+				LocalPath: filepath.Join(home, "manifests", "b.yml"),
+				Digest:    "digest-b",
+				AddedAt:   time.Now().UTC(),
+			},
+		},
+	}
+	if err := entries.Save(registryPath); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "ls"}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	output := stdout.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected multiple lines in stdout, got %q", output)
+	}
+	if !strings.Contains(lines[0], "ID") || !strings.Contains(lines[0], "SOURCE") {
+		t.Fatalf("expected header line, got %q", lines[0])
+	}
+	first := strings.Index(output, "bbbb2222")
+	second := strings.Index(output, "aaaa1111")
+	if first == -1 || second == -1 || first > second {
+		t.Fatalf("expected newer entry first, got output: %q", output)
+	}
+}
+
+func TestRunPkgRm_ByID(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	manifestPath := filepath.Join(home, "manifests", "abc.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifests dir: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+
+	entry := registry.Entry{
+		ID:        "deadbeef",
+		Source:    "/tmp/source.yml",
+		LocalPath: manifestPath,
+		Digest:    "digest",
+		AddedAt:   time.Now().UTC(),
+	}
+	store := registry.Store{Entries: []registry.Entry{entry}}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "rm", entry.ID}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "removed manifest") {
+		t.Fatalf("expected removal message, got %q", stdout.String())
+	}
+	if _, err := os.Stat(manifestPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected manifest to be deleted, stat err=%v", err)
+	}
+	updated, err := registry.Load(registryPath)
+	if err != nil {
+		t.Fatalf("failed to load registry: %v", err)
+	}
+	if len(updated.Entries) != 0 {
+		t.Fatalf("expected registry to be empty, got %d entries", len(updated.Entries))
+	}
+}
+
+func TestRunPkgRm_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "rm", "missing"}, &stdout, &stderr, nil)
+	if exitCode != 2 {
+		t.Fatalf("expected exit code 2, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "no manifest found") {
+		t.Fatalf("expected missing message, got %q", stderr.String())
 	}
 }
