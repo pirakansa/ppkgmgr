@@ -51,6 +51,7 @@ We follow the **Standard Go Project Layout**.
 * Place new files according to the directory guidelines above; avoid introducing unnecessary top-level directories.
 * When modifying existing functions, add or update unit tests and confirm `go test ./...` passes.
 * When writing files or accessing external resources, use temporary directories so existing test data is not overwritten.
+* After any change, ALWAYS run `make build`. 
 
 ---
 
