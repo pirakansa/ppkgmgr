@@ -51,7 +51,6 @@ We follow the **Standard Go Project Layout**.
 * Place new files according to the directory guidelines above; avoid introducing unnecessary top-level directories.
 * When modifying existing functions, add or update unit tests and confirm `go test ./...` passes.
 * When writing files or accessing external resources, use temporary directories so existing test data is not overwritten.
-* After any change, ALWAYS run `make build`. 
 
 ---
 
@@ -105,7 +104,8 @@ Confirm `make build` / `make test` succeed locally before opening a PR. If they 
 
 * If multiple `AGENTS.md` files exist, reference the one closest to your working directory (this repository only has the top-level file).
 * When instructions conflict, prioritize explicit user prompts and clarify any uncertainties.
-* Before and after your work, confirm `go build -o ./bin/host/ ./cmd/<name>` and `go test ./...` succeed. If they fail, report the cause and mitigation (the Makefile `build` / `test` targets wrap these commands).
+* Before and after your work, confirm that `make lint`, `make test`, and `make build` all succeed. If any of them fail, report the cause and mitigation. These Makefile targets wrap the required validation steps and MUST be executed for every task.
+
 
 ---
 
