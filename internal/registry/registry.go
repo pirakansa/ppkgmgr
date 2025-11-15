@@ -15,7 +15,7 @@ type Entry struct {
 	Source    string    `json:"source"`
 	LocalPath string    `json:"local_path"`
 	Digest    string    `json:"digest"`
-	AddedAt   time.Time `json:"added_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Store struct {
@@ -71,6 +71,9 @@ func (s *Store) Upsert(entry Entry) {
 		if existing.Source == entry.Source {
 			if entry.ID == "" {
 				entry.ID = existing.ID
+			}
+			if entry.UpdatedAt.IsZero() {
+				entry.UpdatedAt = existing.UpdatedAt
 			}
 			s.Entries[i] = entry
 			return

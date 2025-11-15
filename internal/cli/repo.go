@@ -125,7 +125,6 @@ func handleRepoAdd(cmd *cobra.Command, source string) error {
 		Source:    source,
 		LocalPath: target,
 		Digest:    digest,
-		AddedAt:   time.Now().UTC(),
 	})
 
 	if err := store.Save(registryPath); err != nil {
@@ -161,19 +160,25 @@ func handleRepoLs(cmd *cobra.Command) error {
 
 	entries := append([]registry.Entry(nil), store.Entries...)
 	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].AddedAt.Equal(entries[j].AddedAt) {
+		switch {
+		case entries[i].UpdatedAt.Equal(entries[j].UpdatedAt):
 			return entries[i].Source < entries[j].Source
+		case entries[i].UpdatedAt.IsZero():
+			return false
+		case entries[j].UpdatedAt.IsZero():
+			return true
+		default:
+			return entries[i].UpdatedAt.After(entries[j].UpdatedAt)
 		}
-		return entries[i].AddedAt.After(entries[j].AddedAt)
 	})
 
 	table := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(table, "ID\tSOURCE\tADDED AT")
+	fmt.Fprintln(table, "ID\tSOURCE\tUPDATED AT")
 	for _, entry := range entries {
 		fmt.Fprintf(table, "%s\t%s\t%s\n",
 			displayValue(entry.ID),
 			displayValue(entry.Source),
-			formatAddedAt(entry.AddedAt),
+			formatUpdatedAt(entry.UpdatedAt),
 		)
 	}
 	if err := table.Flush(); err != nil {
@@ -229,7 +234,7 @@ func displayValue(val string) string {
 	return val
 }
 
-func formatAddedAt(t time.Time) string {
+func formatUpdatedAt(t time.Time) string {
 	if t.IsZero() {
 		return "-"
 	}

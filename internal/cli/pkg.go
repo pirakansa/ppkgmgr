@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"ppkgmgr/internal/data"
 	"ppkgmgr/internal/registry"
@@ -151,10 +152,13 @@ func refreshStoredManifest(entry *registry.Entry) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	changed := !strings.EqualFold(entry.Digest, computed)
+	changed := entry.UpdatedAt.IsZero() || !strings.EqualFold(entry.Digest, computed)
 	entry.Digest = computed
 	if entry.ID == "" {
 		entry.ID = generateEntryID(entry.Source)
+	}
+	if changed {
+		entry.UpdatedAt = time.Now().UTC()
 	}
 	return changed, nil
 }

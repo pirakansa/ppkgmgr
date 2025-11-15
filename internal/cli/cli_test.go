@@ -450,14 +450,14 @@ func TestRunRepoLs_ListEntries(t *testing.T) {
 				Source:    "https://example.com/a.yml",
 				LocalPath: filepath.Join(home, "manifests", "a.yml"),
 				Digest:    "digest-a",
-				AddedAt:   time.Now().UTC().Add(-time.Hour),
+				UpdatedAt: time.Now().UTC().Add(-time.Hour),
 			},
 			{
 				ID:        "bbbb2222",
 				Source:    "https://example.com/b.yml",
 				LocalPath: filepath.Join(home, "manifests", "b.yml"),
 				Digest:    "digest-b",
-				AddedAt:   time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
 			},
 		},
 	}
@@ -475,7 +475,7 @@ func TestRunRepoLs_ListEntries(t *testing.T) {
 	if len(lines) < 3 {
 		t.Fatalf("expected multiple lines in stdout, got %q", output)
 	}
-	if !strings.Contains(lines[0], "ID") || !strings.Contains(lines[0], "SOURCE") {
+	if !strings.Contains(lines[0], "ID") || !strings.Contains(lines[0], "SOURCE") || !strings.Contains(lines[0], "UPDATED AT") {
 		t.Fatalf("expected header line, got %q", lines[0])
 	}
 	first := strings.Index(output, "bbbb2222")
@@ -503,7 +503,7 @@ func TestRunRepoRm_ByID(t *testing.T) {
 		Source:    "/tmp/source.yml",
 		LocalPath: manifestPath,
 		Digest:    "digest",
-		AddedAt:   time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 	store := registry.Store{Entries: []registry.Entry{entry}}
 	registryPath := filepath.Join(home, "registry.json")
@@ -604,7 +604,7 @@ func TestRunPkgUp_RefreshAndDownload(t *testing.T) {
 				Source:    sourceManifest,
 				LocalPath: manifestPath,
 				Digest:    "old",
-				AddedAt:   time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
 			},
 		},
 	}
@@ -705,7 +705,7 @@ func TestRunPkgUp_SkipWhenDigestMatches(t *testing.T) {
 				Source:    sourceManifest,
 				LocalPath: manifestPath,
 				Digest:    digest,
-				AddedAt:   time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
 			},
 		},
 	}
@@ -726,6 +726,80 @@ func TestRunPkgUp_SkipWhenDigestMatches(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "manifest unchanged") {
 		t.Fatalf("expected unchanged message, got %q", stdout.String())
+	}
+}
+
+func TestRunPkgUp_ForceDownloadWhenNeverUpdated(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	sourceManifest := filepath.Join(dir, "source.yml")
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n", outDir)
+	if err := os.WriteFile(sourceManifest, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write source manifest: %v", err)
+	}
+
+	manifestPath := filepath.Join(home, "manifests", "cached.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifest dir: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write cached manifest: %v", err)
+	}
+	_, digest, err := verifyDigest(manifestPath, "")
+	if err != nil {
+		t.Fatalf("failed to hash manifest: %v", err)
+	}
+
+	store := registry.Store{
+		Entries: []registry.Entry{
+			{
+				ID:        "entry",
+				Source:    sourceManifest,
+				LocalPath: manifestPath,
+				Digest:    digest,
+			},
+		},
+	}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to seed registry: %v", err)
+	}
+
+	var downloaded bool
+	downloader := func(url, path string) (int64, error) {
+		if url != "https://example.com/tool.bin" {
+			t.Fatalf("unexpected url %q", url)
+		}
+		if path != filepath.Join(outDir, "tool.bin") {
+			t.Fatalf("unexpected download path %q", path)
+		}
+		if err := os.WriteFile(path, []byte("tool-data"), 0o644); err != nil {
+			return 0, err
+		}
+		downloaded = true
+		return 0, nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"pkg", "up"}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+	if !downloaded {
+		t.Fatalf("expected download to run")
+	}
+	updatedStore, err := registry.Load(registryPath)
+	if err != nil {
+		t.Fatalf("failed to reload registry: %v", err)
+	}
+	if len(updatedStore.Entries) != 1 || updatedStore.Entries[0].UpdatedAt.IsZero() {
+		t.Fatalf("expected updated timestamp to be recorded")
 	}
 }
 
@@ -765,7 +839,7 @@ func TestRunPkgUp_RemovesOldYamlOnChange(t *testing.T) {
 				Source:    sourceManifest,
 				LocalPath: manifestPath,
 				Digest:    "old",
-				AddedAt:   time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
 			},
 		},
 	}
