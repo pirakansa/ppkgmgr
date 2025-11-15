@@ -27,7 +27,7 @@ func TestDefaultData(t *testing.T) {
 func TestRun_Version(t *testing.T) {
 	Version = "1.2.3"
 	var stdout, stderr bytes.Buffer
-	exitCode := run([]string{"-v"}, &stdout, &stderr, nil)
+	exitCode := run([]string{"version"}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -39,20 +39,31 @@ func TestRun_Version(t *testing.T) {
 	}
 }
 
-func TestRun_RequireFileOption(t *testing.T) {
+func TestRun_RequireSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	exitCode := run([]string{}, &stdout, &stderr, nil)
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
-	if !strings.Contains(stderr.String(), "require -f option") {
-		t.Fatalf("expected require -f option message, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "require subcommand") {
+		t.Fatalf("expected require subcommand message, got %q", stderr.String())
+	}
+}
+
+func TestRun_RequireManifestArgument(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"act"}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "require manifest path argument") {
+		t.Fatalf("expected require manifest message, got %q", stderr.String())
 	}
 }
 
 func TestRun_PathNotFound(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	exitCode := run([]string{"-f", "missing.yml"}, &stdout, &stderr, nil)
+	exitCode := run([]string{"act", "missing.yml"}, &stdout, &stderr, nil)
 	if exitCode != 2 {
 		t.Fatalf("expected exit code 2, got %d", exitCode)
 	}
@@ -68,7 +79,7 @@ func TestRun_ParseError(t *testing.T) {
 		t.Fatalf("failed to write bad file: %v", err)
 	}
 	var stdout, stderr bytes.Buffer
-	exitCode := run([]string{"-f", badFile}, &stdout, &stderr, nil)
+	exitCode := run([]string{"act", badFile}, &stdout, &stderr, nil)
 	if exitCode != 3 {
 		t.Fatalf("expected exit code 3, got %d", exitCode)
 	}
@@ -85,7 +96,7 @@ func TestRun_Spider(t *testing.T) {
 		t.Fatalf("failed to write yaml: %v", err)
 	}
 	var stdout, stderr bytes.Buffer
-	exitCode := run([]string{"--spider", "-f", yamlPath}, &stdout, &stderr, nil)
+	exitCode := run([]string{"act", "--spider", yamlPath}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -119,7 +130,7 @@ func TestRun_DownloadSuccess(t *testing.T) {
 		return 123, nil
 	}
 
-	exitCode := run([]string{"-f", yamlPath}, &stdout, &stderr, downloader)
+	exitCode := run([]string{"act", yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -147,7 +158,7 @@ func TestRun_DownloadAbsoluteRename(t *testing.T) {
 		return 0, nil
 	}
 
-	exitCode := run([]string{"-f", yamlPath}, &stdout, &stderr, downloader)
+	exitCode := run([]string{"act", yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -179,7 +190,7 @@ func TestRun_RemoteYAML(t *testing.T) {
 		return 1, nil
 	}
 
-	exitCode := run([]string{"-f", server.URL + "/config.yml"}, &stdout, &stderr, downloader)
+	exitCode := run([]string{"act", server.URL + "/config.yml"}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -205,7 +216,7 @@ func TestRun_DownloadError(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := run([]string{"-f", yamlPath}, &stdout, &stderr, downloader)
+	exitCode := run([]string{"act", yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 4 {
 		t.Fatalf("expected exit code 4, got %d", exitCode)
 	}
@@ -241,7 +252,7 @@ func TestRun_DownloadDigestMatch(t *testing.T) {
 		return int64(len(fileContent)), nil
 	}
 
-	exitCode := run([]string{"-f", yamlPath}, &stdout, &stderr, downloader)
+	exitCode := run([]string{"act", yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -273,7 +284,7 @@ func TestRun_DownloadDigestMismatch(t *testing.T) {
 		return int64(len(fileContent)), nil
 	}
 
-	exitCode := run([]string{"-f", yamlPath}, &stdout, &stderr, downloader)
+	exitCode := run([]string{"act", yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}

@@ -11,9 +11,9 @@
 
 ### Command Examples
 ```sh
-$ ppkgmgr -f <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
-$ ppkgmgr --spider -f <path_or_url_to_yaml>  # Preview download URLs and paths
-$ ppkgmgr -v  # Display version information
+$ ppkgmgr act <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
+$ ppkgmgr act --spider <path_or_url_to_yaml>  # Preview download URLs and paths
+$ ppkgmgr version  # Display version information
 ```
 
 ## YAML Files

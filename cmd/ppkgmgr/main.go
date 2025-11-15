@@ -30,34 +30,56 @@ func defaultData(val string, def string) string {
 }
 
 func run(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
-	fs := flag.NewFlagSet("ppkgmgr", flag.ContinueOnError)
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "require subcommand")
+		return 1
+	}
+
+	switch args[0] {
+	case "version":
+		return runVersion(args[1:], stdout, stderr)
+	case "act":
+		return runAct(args[1:], stdout, stderr, downloader)
+	default:
+		fmt.Fprintf(stderr, "unknown subcommand: %s\n", args[0])
+		return 1
+	}
+}
+
+func runVersion(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("version", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintln(stderr, "unexpected arguments")
+		return 1
+	}
+	fmt.Fprintf(stdout, "Version : %s\n", Version)
+	return 0
+}
+
+func runAct(args []string, stdout, stderr io.Writer, downloader downloadFunc) int {
+	fs := flag.NewFlagSet("act", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var spider bool
-	var ver bool
-	var filePath string
 	fs.BoolVar(&spider, "spider", false, "no act")
-	fs.BoolVar(&ver, "v", false, "print version")
-	fs.StringVar(&filePath, "f", "", "path or URL to manifest")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
-	if ver {
-		fmt.Fprintf(stdout, "Version : %s\n", Version)
-		return 0
-	}
-
-	if filePath == "" {
-		fmt.Fprintln(stderr, "require -f option")
+	manifestArgs := fs.Args()
+	if len(manifestArgs) == 0 {
+		fmt.Fprintln(stderr, "require manifest path argument")
 		return 1
 	}
-
-	if len(fs.Args()) > 0 {
+	if len(manifestArgs) > 1 {
 		fmt.Fprintln(stderr, "unexpected arguments")
 		return 1
 	}
 
-	path := filePath
+	path := manifestArgs[0]
 
 	if !isRemotePath(path) {
 		if _, err := os.Stat(path); err != nil {
