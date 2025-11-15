@@ -104,7 +104,7 @@ Confirm `make build` / `make test` succeed locally before opening a PR. If they 
 
 * If multiple `AGENTS.md` files exist, reference the one closest to your working directory (this repository only has the top-level file).
 * When instructions conflict, prioritize explicit user prompts and clarify any uncertainties.
-* Before and after your work, confirm that `make lint`, `make test`, and `make build` all succeed. If any of them fail, report the cause and mitigation. These Makefile targets wrap the required validation steps and MUST be executed for every task.
+* Before and after your work, ensure `make lint`, `make test`, and `make build` all succeed; report the cause and fix if any of them fail.
 
 
 ---
