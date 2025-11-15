@@ -78,6 +78,16 @@ func handleRepoAdd(cmd *cobra.Command, source string) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
+	originalSource := strings.TrimSpace(source)
+
+	normalizedSource, err := resolveManifestSource(originalSource)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to resolve manifest path: %v\n", err)
+		return cliError{code: 3}
+	}
+
+	source = normalizedSource
+
 	raw, err := data.LoadRaw(source)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to load manifest: %v\n", err)
@@ -116,16 +126,38 @@ func handleRepoAdd(cmd *cobra.Command, source string) error {
 	}
 
 	entryID := generateEntryID(source)
-	if existing, ok := store.GetBySource(source); ok && existing.ID != "" {
+	existing, ok := store.GetBySource(source)
+	if !ok && !isRemotePath(originalSource) {
+		candidates := []string{originalSource}
+		if cleaned := filepath.Clean(originalSource); cleaned != "" && cleaned != originalSource {
+			candidates = append(candidates, cleaned)
+		}
+		for _, candidate := range candidates {
+			if candidate == source {
+				continue
+			}
+			if legacy, removed := store.RemoveBySource(candidate); removed {
+				existing = legacy
+				ok = true
+				break
+			}
+		}
+	}
+	if ok && existing.ID != "" {
 		entryID = existing.ID
 	}
 
-	store.Upsert(registry.Entry{
+	entry := registry.Entry{
 		ID:        entryID,
 		Source:    source,
 		LocalPath: target,
 		Digest:    digest,
-	})
+	}
+	if ok && !existing.UpdatedAt.IsZero() {
+		entry.UpdatedAt = existing.UpdatedAt
+	}
+
+	store.Upsert(entry)
 
 	if err := store.Save(registryPath); err != nil {
 		fmt.Fprintf(stderr, "failed to save registry: %v\n", err)
@@ -238,6 +270,27 @@ func handleRepoRm(cmd *cobra.Command, selector string) error {
 
 	fmt.Fprintf(stdout, "removed manifest: %s\n", displayValue(entry.Source))
 	return nil
+}
+
+func resolveManifestSource(source string) (string, error) {
+	if isRemotePath(source) {
+		return source, nil
+	}
+	if source == "" {
+		return "", fmt.Errorf("manifest source cannot be empty")
+	}
+
+	cleaned := filepath.Clean(source)
+	if filepath.IsAbs(cleaned) {
+		return cleaned, nil
+	}
+
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("resolve absolute path: %w", err)
+	}
+
+	return abs, nil
 }
 
 func displayValue(val string) string {
