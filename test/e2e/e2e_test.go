@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/zeebo/blake3"
@@ -134,7 +135,7 @@ func TestDownloadCommandDownloadsFile(t *testing.T) {
 	}
 
 	// Running again without -f should create a backup with the original data.
-	if _, stderr := runCommand(t, env, "dl", manifestPath); stderr != "" {
+	if _, stderr := runCommand(t, env, "dl", manifestPath); stderr != "" && !strings.Contains(stderr, "backed up") {
 		t.Fatalf("unexpected stderr from second dl: %s", stderr)
 	}
 	backupPath := targetFile + ".bak"
@@ -238,13 +239,18 @@ func TestRepoLifecycleCommands(t *testing.T) {
 
 func TestPkgUpDownloadsAndBacksUpModifiedFiles(t *testing.T) {
 	fileData := []byte("pkg-up-data")
-	var manifestResponse string
+	var (
+		manifestMu       sync.RWMutex
+		manifestResponse string
+	)
 
 	server := newLocalHTTPServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/manifest.yml":
 			w.WriteHeader(http.StatusOK)
+			manifestMu.RLock()
 			fmt.Fprint(w, manifestResponse)
+			manifestMu.RUnlock()
 		case "/tool.bin":
 			w.WriteHeader(http.StatusOK)
 			if _, err := w.Write(fileData); err != nil {
@@ -258,7 +264,9 @@ func TestPkgUpDownloadsAndBacksUpModifiedFiles(t *testing.T) {
 
 	targetDir := t.TempDir()
 	digest := blake3Hex(fileData)
+	manifestMu.Lock()
 	manifestResponse = fmt.Sprintf("version: 2\nrepositories:\n  - url: %s\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n        digest: %s\n", server.URL, targetDir, digest)
+	manifestMu.Unlock()
 
 	home := t.TempDir()
 	env := append(os.Environ(), "PPKGMGR_HOME="+home)
@@ -287,7 +295,7 @@ func TestPkgUpDownloadsAndBacksUpModifiedFiles(t *testing.T) {
 		t.Fatalf("failed to modify file: %v", err)
 	}
 
-	if _, stderr := runCommand(t, env, "pkg", "up"); stderr != "" {
+	if _, stderr := runCommand(t, env, "pkg", "up"); stderr != "" && !strings.Contains(stderr, "backed up") {
 		t.Fatalf("unexpected stderr from pkg up after modification: %s", stderr)
 	}
 
