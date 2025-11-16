@@ -24,25 +24,27 @@ build:
 run:
 	@go run $(GO_TAG_FLAGS) $(CMD_DIR)
 
-.PHONY: release
-release: $(LINUX_AMD64) $(LINUX_ARM) $(LINUX_ARM64)
+.PHONY: release release-build release-archives
+release: release-archives
+release-build: $(LINUX_AMD64) $(LINUX_ARM) $(LINUX_ARM64) $(WIN_AMD64)
+release-archives: release-build
+	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_AMD64)/ --file=./$(PROJECT_NAME)_$(LINUX_AMD64).tar.gz .
+	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_ARM)/   --file=./$(PROJECT_NAME)_$(LINUX_ARM).tar.gz .
+	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_ARM64)/ --file=./$(PROJECT_NAME)_$(LINUX_ARM64).tar.gz .
+	@tar --gunzip --create --directory=$(BINDIR)/$(WIN_AMD64)/   --file=./$(PROJECT_NAME)_$(WIN_AMD64).tar.gz .
 
 $(LINUX_AMD64):
 	@mkdir -p $(BINDIR)/$(LINUX_AMD64)
 	@GOOS=linux   GOARCH=amd64 go build $(GO_TAG_FLAGS) $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_AMD64)/   $(CMD_DIR)
-	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_AMD64)/ --file=./$(PROJECT_NAME)_$(LINUX_AMD64).tar.gz .
 $(LINUX_ARM):
 	@mkdir -p $(BINDIR)/$(LINUX_ARM)
 	@GOOS=linux   GOARCH=arm   go build $(GO_TAG_FLAGS) $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_ARM)/     $(CMD_DIR)
-	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_ARM)/   --file=./$(PROJECT_NAME)_$(LINUX_ARM).tar.gz .
 $(LINUX_ARM64):
 	@mkdir -p $(BINDIR)/$(LINUX_ARM64)
 	@GOOS=linux   GOARCH=arm64 go build $(GO_TAG_FLAGS) $(GO_LDFLAGS) -o $(BINDIR)/$(LINUX_ARM64)/   $(CMD_DIR)
-	@tar --gunzip --create --directory=$(BINDIR)/$(LINUX_ARM64)/ --file=./$(PROJECT_NAME)_$(LINUX_ARM64).tar.gz .
 $(WIN_AMD64):
 	@mkdir -p $(BINDIR)/$(WIN_AMD64)
 	@GOOS=windows GOARCH=amd64 go build $(GO_TAG_FLAGS) $(GO_LDFLAGS) -o $(BINDIR)/$(WIN_AMD64)/     $(CMD_DIR)
-	@tar --gunzip --create --directory=$(BINDIR)/$(WIN_AMD64)/   --file=./$(PROJECT_NAME)_$(WIN_AMD64).tar.gz .
 
 .PHONY: debug
 debug:
@@ -70,7 +72,7 @@ govulncheck:
 lint: vet staticcheck
 
 .PHONY: test
-test: lint
+test: lint build
 	@go test -race $(GO_TAG_FLAGS) -v ./...
 
 .PHONY: clean
