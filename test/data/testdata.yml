@@ -16,7 +16,7 @@ repositories:
       -
         file_name: index.html
         digest: 454499efc25b742a1eaa37e1b2ec934638b05cef87b036235c087d54ee5dde59
-        rename: inde1.html
+        rename: index1.html
         out_dir: ./tmp.test
       -
         file_name: index.html

@@ -45,7 +45,7 @@ func TestParseSuccess(t *testing.T) {
 		t.Fatalf("expected 2 files for second repo, got %d", len(second.Files))
 	}
 	file = second.Files[0]
-	if file.FileName != "index.html" || file.Rename != "inde1.html" || file.OutDir != "./tmp.test" {
+	if file.FileName != "index.html" || file.Rename != "index1.html" || file.OutDir != "./tmp.test" {
 		t.Fatalf("unexpected first file data in second repo: %+v", file)
 	}
 	if file.Digest != "454499efc25b742a1eaa37e1b2ec934638b05cef87b036235c087d54ee5dde59" {
