@@ -8,7 +8,7 @@ LINUX_ARM    := linux-arm
 LINUX_ARM64  := linux-arm64
 WIN_AMD64    := win-amd64
 CMD_DIR      := ./cmd/$(PROJECT_NAME)
-VERSION      := 0.3.0
+VERSION      := 0.4.0
 GO_LDFLAGS   := -ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
 GO_TAGS      := osusergo netgo
 GO_TAG_FLAGS := -tags="$(GO_TAGS)"
