@@ -102,7 +102,7 @@ func (u *pkgUpdater) updateEntry(entry *registry.Entry) bool {
 			cleanupOldTargets(previousTargets, u.stderr)
 		}
 	case u.force:
-		fmt.Fprintf(u.stdout, "forced refresh: %s\n", displayValue(entry.Source))
+		fmt.Fprintf(u.stdout, "redownload requested: %s\n", displayValue(entry.Source))
 	default:
 		needsRefresh, err := filesNeedRefresh(fd)
 		if err != nil {

@@ -457,7 +457,7 @@ func TestRun_DownloadBackupsExistingFile(t *testing.T) {
 	}
 }
 
-func TestRun_DownloadForceSkipsBackup(t *testing.T) {
+func TestRun_DownloadOverwriteSkipsBackup(t *testing.T) {
 	dir := t.TempDir()
 	targetDir := filepath.Join(dir, "out")
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
@@ -482,7 +482,7 @@ func TestRun_DownloadForceSkipsBackup(t *testing.T) {
 		return 16, nil
 	}
 
-	exitCode := Run([]string{"dl", "-f", yamlPath}, &stdout, &stderr, downloader)
+	exitCode := Run([]string{"dl", "--overwrite", yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
 	}
@@ -1112,7 +1112,7 @@ func TestRunPkgUp_SkipWhenDigestMatches(t *testing.T) {
 	}
 }
 
-func TestRunPkgUp_ForceFlagDownloadsWhenDigestMatches(t *testing.T) {
+func TestRunPkgUp_RedownloadFlagDownloadsWhenDigestMatches(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
 	t.Setenv("PPKGMGR_HOME", home)
@@ -1168,19 +1168,19 @@ func TestRunPkgUp_ForceFlagDownloadsWhenDigestMatches(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"pkg", "up", "-f"}, &stdout, &stderr, downloader)
+	exitCode := Run([]string{"pkg", "up", "--redownload"}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
 	}
 	if !downloaded {
 		t.Fatalf("expected download to run")
 	}
-	if !strings.Contains(stdout.String(), "forced refresh") {
-		t.Fatalf("expected forced refresh message, got %q", stdout.String())
+	if !strings.Contains(stdout.String(), "redownload requested") {
+		t.Fatalf("expected redownload message, got %q", stdout.String())
 	}
 }
 
-func TestRunPkgUp_ForceDownloadWhenNeverUpdated(t *testing.T) {
+func TestRunPkgUp_RedownloadWhenNeverUpdated(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
 	t.Setenv("PPKGMGR_HOME", home)

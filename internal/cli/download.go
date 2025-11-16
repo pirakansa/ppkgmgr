@@ -12,7 +12,7 @@ import (
 // newDownloadCmd wires the `dl` command that downloads manifest entries.
 func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
 	var spider bool
-	var force bool
+	var overwrite bool
 
 	cmd := &cobra.Command{
 		Use:   "dl <manifest>",
@@ -44,11 +44,11 @@ func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
 				return cliError{code: 3}
 			}
 
-			return downloadManifestFiles(fd, downloader, stdout, stderr, spider, force, false)
+			return downloadManifestFiles(fd, downloader, stdout, stderr, spider, overwrite, false)
 		},
 	}
 
 	cmd.Flags().BoolVar(&spider, "spider", false, "no dl")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "overwrite existing files without backups")
+	cmd.Flags().BoolVarP(&overwrite, "overwrite", "o", false, "overwrite existing files without backups")
 	return cmd
 }

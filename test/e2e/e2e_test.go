@@ -134,7 +134,7 @@ func TestDownloadCommandDownloadsFile(t *testing.T) {
 		t.Fatalf("unexpected file contents %q", data)
 	}
 
-	// Running again without -f should create a backup with the original data.
+	// Running again without --overwrite should create a backup with the original data.
 	if _, stderr := runCommand(t, env, "dl", manifestPath); stderr != "" && !strings.Contains(stderr, "backed up") {
 		t.Fatalf("unexpected stderr from second dl: %s", stderr)
 	}
