@@ -83,6 +83,44 @@ func TestRun_Help(t *testing.T) {
 	}
 }
 
+func TestRun_Dig(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "tool.bin")
+	content := []byte("digest me please")
+	if err := os.WriteFile(target, content, 0o644); err != nil {
+		t.Fatalf("failed to write sample file: %v", err)
+	}
+
+	hasher := blake3.Sum256(content)
+	expected := hex.EncodeToString(hasher[:])
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dig", target}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stdout.String() != expected+"\n" {
+		t.Fatalf("expected stdout %q, got %q", expected+"\n", stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_DigRequireArgument(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dig"}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "require file path argument") {
+		t.Fatalf("expected argument error, got %q", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+}
+
 func TestRunRepo_RequireSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	exitCode := Run([]string{"repo"}, &stdout, &stderr, nil)

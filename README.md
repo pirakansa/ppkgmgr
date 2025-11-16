@@ -19,6 +19,7 @@ $ ppkgmgr repo ls  # Show registered manifests stored locally
 $ ppkgmgr repo rm <id_or_source>  # Remove a stored manifest by ID or source URL/path
 $ ppkgmgr pkg up  # Refresh stored manifests under ~/.ppkgmgr and redownload their files
 $ ppkgmgr ver  # Display version information
+$ ppkgmgr dig <path_to_file>  # Show the BLAKE3 digest for a file
 ```
 
 `repo add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. Use `repo ls` to inspect saved manifests and `repo rm` when you want to delete an entry. This registry will later be used by commands such as `repo fetch` to detect changes.
