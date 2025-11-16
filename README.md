@@ -12,6 +12,7 @@
 ```sh
 $ ppkgmgr help  # Display available subcommands and usage
 $ ppkgmgr dl <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
+$ ppkgmgr dl -f <path_or_url_to_yaml>  # Overwrite existing files without keeping backups
 $ ppkgmgr dl --spider <path_or_url_to_yaml>  # Preview download URLs and paths
 $ ppkgmgr repo add <path_or_url_to_yaml>  # Backup the manifest under ~/.ppkgmgr for later use
 $ ppkgmgr repo ls  # Show registered manifests stored locally
@@ -23,6 +24,8 @@ $ ppkgmgr ver  # Display version information
 `repo add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. Use `repo ls` to inspect saved manifests and `repo rm` when you want to delete an entry. This registry will later be used by commands such as `repo fetch` to detect changes.
 
 `pkg up` reads the stored manifests under `~/.ppkgmgr`, refreshes them from their original sources when possible, and downloads all referenced files so local copies stay up to date. When the refreshed manifest has the same digest as the stored copy, downloads are skipped to avoid unnecessary work.
+
+Running `ppkgmgr dl` without additional flags now preserves any pre-existing files by moving them to `<filename>.bak` (or a numbered variant) before downloading replacements. Supply `-f`/`--force` when you want to skip this backup and overwrite files immediately.
 
 ## YAML Files
 

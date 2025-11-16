@@ -373,6 +373,93 @@ func TestRun_DownloadDigestMismatch(t *testing.T) {
 	}
 }
 
+func TestRun_DownloadBackupsExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	targetDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatalf("failed to create output dir: %v", err)
+	}
+	targetPath := filepath.Join(targetDir, "file.txt")
+	original := []byte("original data")
+	if err := os.WriteFile(targetPath, original, 0o644); err != nil {
+		t.Fatalf("failed to seed file: %v", err)
+	}
+
+	yamlPath := filepath.Join(dir, "config.yml")
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: %s\n", targetDir)
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	downloader := func(url, path string) (int64, error) {
+		if err := os.WriteFile(path, []byte("new data"), 0o644); err != nil {
+			return 0, err
+		}
+		return 8, nil
+	}
+
+	exitCode := Run([]string{"dl", yamlPath}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+
+	backupPath := targetPath + ".bak"
+	if _, err := os.Stat(backupPath); err != nil {
+		t.Fatalf("expected backup %s to exist: %v", backupPath, err)
+	}
+	if data, err := os.ReadFile(backupPath); err != nil || !bytes.Equal(data, original) {
+		t.Fatalf("expected backup to contain original data, got %q err=%v", data, err)
+	}
+	if data, err := os.ReadFile(targetPath); err != nil || string(data) != "new data" {
+		t.Fatalf("expected target to be replaced, got %q err=%v", data, err)
+	}
+	if !strings.Contains(stderr.String(), "backed up") {
+		t.Fatalf("expected backup message, got %q", stderr.String())
+	}
+}
+
+func TestRun_DownloadForceSkipsBackup(t *testing.T) {
+	dir := t.TempDir()
+	targetDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatalf("failed to create output dir: %v", err)
+	}
+	targetPath := filepath.Join(targetDir, "file.txt")
+	if err := os.WriteFile(targetPath, []byte("force data"), 0o644); err != nil {
+		t.Fatalf("failed to seed file: %v", err)
+	}
+
+	yamlPath := filepath.Join(dir, "config.yml")
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: %s\n", targetDir)
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	downloader := func(url, path string) (int64, error) {
+		if err := os.WriteFile(path, []byte("forced overwrite"), 0o644); err != nil {
+			return 0, err
+		}
+		return 16, nil
+	}
+
+	exitCode := Run([]string{"dl", "-f", yamlPath}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+
+	if _, err := os.Stat(targetPath + ".bak"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no backup, got err=%v", err)
+	}
+	if data, err := os.ReadFile(targetPath); err != nil || string(data) != "forced overwrite" {
+		t.Fatalf("expected overwritten data, got %q err=%v", data, err)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
 func TestRunRepoAdd_Success(t *testing.T) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, ".ppkgmgr")
