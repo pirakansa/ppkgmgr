@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"ppkgmgr/internal/registry"
+	"github.com/pirakansa/ppkgmgr/internal/registry"
 
 	"github.com/zeebo/blake3"
 )

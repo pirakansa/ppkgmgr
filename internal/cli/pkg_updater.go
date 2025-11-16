@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"ppkgmgr/internal/data"
-	"ppkgmgr/internal/registry"
+	"github.com/pirakansa/ppkgmgr/internal/data"
+	"github.com/pirakansa/ppkgmgr/internal/registry"
 )
 
 // pkgUpdater orchestrates refreshing manifests and retrieving referenced files.

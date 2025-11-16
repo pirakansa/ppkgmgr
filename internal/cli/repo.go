@@ -10,8 +10,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"ppkgmgr/internal/data"
-	"ppkgmgr/internal/registry"
+	"github.com/pirakansa/ppkgmgr/internal/data"
+	"github.com/pirakansa/ppkgmgr/internal/registry"
 
 	"github.com/spf13/cobra"
 )

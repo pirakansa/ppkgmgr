@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"ppkgmgr/internal/data"
+	"github.com/pirakansa/ppkgmgr/internal/data"
 
 	"github.com/spf13/cobra"
 )
