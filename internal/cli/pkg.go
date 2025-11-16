@@ -35,7 +35,7 @@ func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
 			return handlePkgUp(cmd, downloader, force)
 		},
 	}
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "download even if the manifest digest matches")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "download even if the manifest digest matches (backups still apply)")
 	return cmd
 }
 

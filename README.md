@@ -18,13 +18,14 @@ $ ppkgmgr repo add <path_or_url_to_yaml>  # Backup the manifest under ~/.ppkgmgr
 $ ppkgmgr repo ls  # Show registered manifests stored locally
 $ ppkgmgr repo rm <id_or_source>  # Remove a stored manifest by ID or source URL/path
 $ ppkgmgr pkg up  # Refresh stored manifests under ~/.ppkgmgr and redownload their files
+$ ppkgmgr pkg up --force  # Refresh and download even when manifest digests match
 $ ppkgmgr ver  # Display version information
 $ ppkgmgr dig <path_to_file>  # Show the BLAKE3 digest for a file
 ```
 
 `repo add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. Use `repo ls` to inspect saved manifests and `repo rm` when you want to delete an entry. This registry will later be used by commands such as `repo fetch` to detect changes.
 
-`pkg up` reads the stored manifests under `~/.ppkgmgr`, refreshes them from their original sources when possible, and downloads all referenced files so local copies stay up to date. When the refreshed manifest has the same digest as the stored copy, downloads are skipped to avoid unnecessary work.
+`pkg up` reads the stored manifests under `~/.ppkgmgr`, refreshes them from their original sources when possible, and downloads all referenced files so local copies stay up to date. When the refreshed manifest has the same digest as the stored copy, downloads are skipped to avoid unnecessary work. Pass `--force` when you want to bypass the digest check and download anyway; this does **not** disable the backup behavior described below.
 
 Running `ppkgmgr dl` without additional flags now preserves any pre-existing files by moving them to `<filename>.bak` (or a numbered variant) before downloading replacements. Supply `-f`/`--force` when you want to skip this backup and overwrite files immediately. The same safeguard applies when `pkg up` notices a digest-protected file has been modified locally or when `repo rm` deletes tracked files—those files are renamed to `.bak` variants so user changes stay recoverable.
 
