@@ -107,7 +107,7 @@ func (u *pkgUpdater) updateEntry(entry *registry.Entry) bool {
 		return true
 	}
 
-	if err := downloadManifestFiles(fd, u.downloader, u.stdout, u.stderr, false, true); err != nil {
+	if err := downloadManifestFiles(fd, u.downloader, u.stdout, u.stderr, false, true, true); err != nil {
 		return true
 	}
 

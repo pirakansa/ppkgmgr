@@ -44,7 +44,7 @@ func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
 				return cliError{code: 3}
 			}
 
-			return downloadManifestFiles(fd, downloader, stdout, stderr, spider, force)
+			return downloadManifestFiles(fd, downloader, stdout, stderr, spider, force, false)
 		},
 	}
 

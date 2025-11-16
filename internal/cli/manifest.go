@@ -20,8 +20,10 @@ type manifestTarget struct {
 
 // downloadManifestFiles walks through every file defined in the manifest and
 // downloads them using the provided downloader. When spider is true, only the
-// planned download operations are printed.
-func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite bool) error {
+// planned download operations are printed. When forceOverwrite is true but
+// safeguardForced is also true, digest-protected files are backed up before
+// overwriting to preserve user changes.
+func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite, safeguardForced bool) error {
 	if downloader == nil && !spider {
 		fmt.Fprintln(stderr, "downloader is required")
 		return cliError{code: 5}
@@ -48,7 +50,7 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 				} else if backupPath != "" {
 					fmt.Fprintf(stderr, "backed up %s to %s\n", dlpath, backupPath)
 				}
-			} else if strings.TrimSpace(fs.Digest) != "" {
+			} else if safeguardForced && strings.TrimSpace(fs.Digest) != "" {
 				if backupPath, err := backupIfDigestMismatch(dlpath, fs.Digest); err != nil {
 					if !errors.Is(err, os.ErrNotExist) {
 						fmt.Fprintf(stderr, "failed to verify existing %s: %v\n", dlpath, err)
