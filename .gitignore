@@ -16,6 +16,7 @@
 
 /bin
 /*.tar.gz
+/.ppkgmgr
 /.env
 /.cache
 /.gocache

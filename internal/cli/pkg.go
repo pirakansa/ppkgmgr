@@ -23,7 +23,7 @@ func newPkgCmd(downloader DownloadFunc) *cobra.Command {
 
 // newPkgUpCmd installs the `pkg up` subcommand responsible for refreshing manifests.
 func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
-	var force bool
+	var redownload bool
 	cmd := &cobra.Command{
 		Use:   "up",
 		Short: "Refresh stored manifests and download referenced files",
@@ -32,20 +32,20 @@ func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
 				fmt.Fprintln(cmd.ErrOrStderr(), "pkg up does not accept arguments")
 				return cliError{code: 1}
 			}
-			return handlePkgUp(cmd, downloader, force)
+			return handlePkgUp(cmd, downloader, redownload)
 		},
 	}
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "download even if the manifest digest matches")
+	cmd.Flags().BoolVarP(&redownload, "redownload", "r", false, "download even if the manifest digest matches (backups still apply)")
 	return cmd
 }
 
 // handlePkgUp executes the `pkg up` workflow using the cobra command context.
-func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc, force bool) error {
+func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc, redownload bool) error {
 	updater := pkgUpdater{
 		downloader: downloader,
 		stdout:     cmd.OutOrStdout(),
 		stderr:     cmd.ErrOrStderr(),
-		force:      force,
+		force:      redownload,
 	}
 	return updater.run()
 }

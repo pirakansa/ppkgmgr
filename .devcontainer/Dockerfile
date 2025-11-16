@@ -1,4 +1,4 @@
-FROM golang:1-bullseye
+FROM golang:1.24-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -23,9 +23,6 @@ RUN useradd -u ${CONTAINER_USERID} -s /bin/bash -m ${CONTAINER_USERNAME} && \
     rm -rf /tmp/*
 
 USER ${CONTAINER_USERNAME}
-
-RUN go install golang.org/x/vuln/cmd/govulncheck@latest && \
-    go install honnef.co/go/tools/cmd/staticcheck@latest
 
 WORKDIR /work
 

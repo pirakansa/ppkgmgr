@@ -83,18 +83,6 @@ func (u *pkgUpdater) updateEntry(entry *registry.Entry) bool {
 		fmt.Fprintf(u.stderr, "warning: failed to refresh %s: %v\n", displayValue(entry.Source), err)
 		return true
 	}
-	if !changed && !u.force {
-		fmt.Fprintf(u.stdout, "manifest unchanged: %s\n", displayValue(entry.Source))
-		return false
-	}
-	if changed {
-		fmt.Fprintf(u.stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
-		if len(previousTargets) != 0 {
-			cleanupOldTargets(previousTargets, u.stderr)
-		}
-	} else {
-		fmt.Fprintf(u.stdout, "forced refresh: %s\n", displayValue(entry.Source))
-	}
 
 	if _, err := os.Stat(entry.LocalPath); err != nil {
 		fmt.Fprintf(u.stderr, "warning: manifest unavailable for %s: %v\n", displayValue(entry.Source), err)
@@ -107,7 +95,28 @@ func (u *pkgUpdater) updateEntry(entry *registry.Entry) bool {
 		return true
 	}
 
-	if err := downloadManifestFiles(fd, u.downloader, u.stdout, u.stderr, false); err != nil {
+	switch {
+	case changed:
+		fmt.Fprintf(u.stdout, "refreshed manifest: %s\n", displayValue(entry.Source))
+		if len(previousTargets) != 0 {
+			cleanupOldTargets(previousTargets, u.stderr)
+		}
+	case u.force:
+		fmt.Fprintf(u.stdout, "redownload requested: %s\n", displayValue(entry.Source))
+	default:
+		needsRefresh, err := filesNeedRefresh(fd)
+		if err != nil {
+			fmt.Fprintf(u.stderr, "warning: failed to inspect files for %s: %v\n", displayValue(entry.Source), err)
+			return true
+		}
+		if !needsRefresh {
+			fmt.Fprintf(u.stdout, "manifest unchanged: %s\n", displayValue(entry.Source))
+			return false
+		}
+		fmt.Fprintf(u.stdout, "files drifted: %s\n", displayValue(entry.Source))
+	}
+
+	if err := downloadManifestFiles(fd, u.downloader, u.stdout, u.stderr, false, true, true); err != nil {
 		return true
 	}
 
@@ -158,8 +167,51 @@ func extractManifestTargets(path string) ([]manifestTarget, error) {
 // cleanupOldTargets removes any outdated files referenced by a manifest.
 func cleanupOldTargets(targets []manifestTarget, stderr io.Writer) {
 	for _, target := range targets {
+		if backupPath, err := backupIfDigestMismatch(target.path, target.digest); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				fmt.Fprintf(stderr, "warning: failed to safeguard %s: %v\n", target.path, err)
+			}
+			continue
+		} else if backupPath != "" {
+			fmt.Fprintf(stderr, "backed up %s to %s\n", target.path, backupPath)
+			continue
+		}
 		if err := os.Remove(target.path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stderr, "warning: failed to remove outdated file %s: %v\n", target.path, err)
 		}
 	}
+}
+
+// filesNeedRefresh reports whether any manifest target is missing or fails its digest.
+func filesNeedRefresh(fd data.FileData) (bool, error) {
+	for _, repo := range fd.Repo {
+		for _, fs := range repo.Files {
+			path, err := resolveDownloadPath(fs)
+			if err != nil {
+				return false, fmt.Errorf("resolve output path for %s: %w", fs.FileName, err)
+			}
+			info, err := os.Stat(path)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					return true, nil
+				}
+				return false, fmt.Errorf("stat %s: %w", path, err)
+			}
+			if info.IsDir() {
+				return true, nil
+			}
+			digest := strings.TrimSpace(fs.Digest)
+			if digest == "" {
+				continue
+			}
+			match, _, err := verifyDigest(path, digest)
+			if err != nil {
+				return false, fmt.Errorf("verify digest for %s: %w", path, err)
+			}
+			if !match {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
