@@ -11,9 +11,11 @@ import (
 	"ppkgmgr/internal/data"
 )
 
-// manifestTarget represents a file path generated from a manifest entry.
+// manifestTarget represents a file path generated from a manifest entry along
+// with metadata required for cleanup decisions.
 type manifestTarget struct {
-	path string
+	path   string
+	digest string
 }
 
 // downloadManifestFiles walks through every file defined in the manifest and
@@ -43,6 +45,15 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 				if backupPath, err := backupOutputIfExists(dlpath); err != nil {
 					fmt.Fprintf(stderr, "failed to backup %s: %v\n", dlpath, err)
 					return cliError{code: 3}
+				} else if backupPath != "" {
+					fmt.Fprintf(stderr, "backed up %s to %s\n", dlpath, backupPath)
+				}
+			} else if strings.TrimSpace(fs.Digest) != "" {
+				if backupPath, err := backupIfDigestMismatch(dlpath, fs.Digest); err != nil {
+					if !errors.Is(err, os.ErrNotExist) {
+						fmt.Fprintf(stderr, "failed to verify existing %s: %v\n", dlpath, err)
+						return cliError{code: 3}
+					}
 				} else if backupPath != "" {
 					fmt.Fprintf(stderr, "backed up %s to %s\n", dlpath, backupPath)
 				}
@@ -99,10 +110,50 @@ func manifestOutputPaths(fd data.FileData) ([]manifestTarget, error) {
 			if err != nil {
 				return nil, err
 			}
-			targets = append(targets, manifestTarget{path: path})
+			targets = append(targets, manifestTarget{
+				path:   path,
+				digest: strings.TrimSpace(fs.Digest),
+			})
 		}
 	}
 	return targets, nil
+}
+
+// backupIfDigestMismatch backs up the file when a digest mismatch indicates
+// the user may have modified the contents manually.
+func backupIfDigestMismatch(path, expected string) (string, error) {
+	expected = strings.TrimSpace(expected)
+	if expected == "" {
+		return "", nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", fmt.Errorf("stat existing file: %w", err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("existing path %s is a directory", path)
+	}
+
+	match, _, err := verifyDigest(path, expected)
+	if err != nil {
+		return "", fmt.Errorf("verify digest: %w", err)
+	}
+	if match {
+		return "", nil
+	}
+
+	backupPath, err := nextBackupPath(path)
+	if err != nil {
+		return "", err
+	}
+	if err := os.Rename(path, backupPath); err != nil {
+		return "", fmt.Errorf("rename backup: %w", err)
+	}
+	return backupPath, nil
 }
 
 // backupOutputIfExists renames an existing file to a .bak variant so that

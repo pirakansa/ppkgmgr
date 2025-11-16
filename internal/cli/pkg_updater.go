@@ -158,6 +158,15 @@ func extractManifestTargets(path string) ([]manifestTarget, error) {
 // cleanupOldTargets removes any outdated files referenced by a manifest.
 func cleanupOldTargets(targets []manifestTarget, stderr io.Writer) {
 	for _, target := range targets {
+		if backupPath, err := backupIfDigestMismatch(target.path, target.digest); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				fmt.Fprintf(stderr, "warning: failed to safeguard %s: %v\n", target.path, err)
+			}
+			continue
+		} else if backupPath != "" {
+			fmt.Fprintf(stderr, "backed up %s to %s\n", target.path, backupPath)
+			continue
+		}
 		if err := os.Remove(target.path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stderr, "warning: failed to remove outdated file %s: %v\n", target.path, err)
 		}

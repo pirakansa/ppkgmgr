@@ -678,6 +678,64 @@ func TestRunRepoRm_RemovesDownloadedFiles(t *testing.T) {
 	}
 }
 
+func TestRunRepoRm_BackupsModifiedFiles(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	manifestPath := filepath.Join(home, "manifests", "abc.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifests dir: %v", err)
+	}
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	expected := []byte("expected")
+	hasher := blake3.New()
+	hasher.Write(expected)
+	digest := hex.EncodeToString(hasher.Sum(nil))
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.bin\n        out_dir: %s\n        digest: %s\n", outDir, digest)
+	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+	targetFile := filepath.Join(outDir, "file.bin")
+	original := []byte("user override")
+	if err := os.WriteFile(targetFile, original, 0o644); err != nil {
+		t.Fatalf("failed to write downloaded file: %v", err)
+	}
+
+	entry := registry.Entry{
+		ID:        "deadbeef",
+		Source:    "/tmp/source.yml",
+		LocalPath: manifestPath,
+		Digest:    "digest",
+		UpdatedAt: time.Now().UTC(),
+	}
+	store := registry.Store{Entries: []registry.Entry{entry}}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := store.Save(registryPath); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"repo", "rm", entry.ID}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+
+	if _, err := os.Stat(targetFile); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected original file to be moved away, err=%v", err)
+	}
+	backupPath := targetFile + ".bak"
+	if data, err := os.ReadFile(backupPath); err != nil || !bytes.Equal(data, original) {
+		t.Fatalf("expected backup to contain original data, got %q err=%v", data, err)
+	}
+	if !strings.Contains(stderr.String(), "backed up") {
+		t.Fatalf("expected backup notice, got %q", stderr.String())
+	}
+}
+
 func TestRunPkg_RequireSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	exitCode := Run([]string{"pkg"}, &stdout, &stderr, nil)
@@ -800,6 +858,76 @@ func TestRunPkgUp_RefreshAndDownload(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "updated files for") {
 		t.Fatalf("expected success message, got %q", stdout.String())
+	}
+}
+
+func TestRunPkgUp_BackupsModifiedFiles(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, ".ppkgmgr")
+	t.Setenv("PPKGMGR_HOME", home)
+
+	outDir := filepath.Join(dir, "out")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("failed to create out dir: %v", err)
+	}
+	desiredContent := []byte("expected-data")
+	hasher := blake3.New()
+	hasher.Write(desiredContent)
+	digest := hex.EncodeToString(hasher.Sum(nil))
+	sourceManifest := filepath.Join(dir, "source.yml")
+	manifestContent := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n        digest: %s\n", outDir, digest)
+	if err := os.WriteFile(sourceManifest, []byte(manifestContent), 0o644); err != nil {
+		t.Fatalf("failed to write source manifest: %v", err)
+	}
+
+	manifestPath := filepath.Join(home, "manifests", "cached.yml")
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("failed to create manifest dir: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, []byte("repositories: []\n"), 0o600); err != nil {
+		t.Fatalf("failed to seed cached manifest: %v", err)
+	}
+
+	entry := registry.Entry{
+		ID:        "entry",
+		Source:    sourceManifest,
+		LocalPath: manifestPath,
+		Digest:    "old",
+		UpdatedAt: time.Now().UTC(),
+	}
+	registryPath := filepath.Join(home, "registry.json")
+	if err := (registry.Store{Entries: []registry.Entry{entry}}).Save(registryPath); err != nil {
+		t.Fatalf("failed to seed registry: %v", err)
+	}
+
+	targetFile := filepath.Join(outDir, "tool.bin")
+	original := []byte("user modifications")
+	if err := os.WriteFile(targetFile, original, 0o644); err != nil {
+		t.Fatalf("failed to write existing file: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	downloader := func(url, path string) (int64, error) {
+		if err := os.WriteFile(path, desiredContent, 0o644); err != nil {
+			return 0, err
+		}
+		return int64(len(desiredContent)), nil
+	}
+
+	exitCode := Run([]string{"pkg", "up"}, &stdout, &stderr, downloader)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%s)", exitCode, stderr.String())
+	}
+
+	backupPath := targetFile + ".bak"
+	if data, err := os.ReadFile(backupPath); err != nil || !bytes.Equal(data, original) {
+		t.Fatalf("expected backup %s to contain original data, got %q err=%v", backupPath, data, err)
+	}
+	if data, err := os.ReadFile(targetFile); err != nil || !bytes.Equal(data, desiredContent) {
+		t.Fatalf("expected target to contain refreshed data, got %q err=%v", data, err)
+	}
+	if !strings.Contains(stderr.String(), "backed up") {
+		t.Fatalf("expected backup notice in stderr, got %q", stderr.String())
 	}
 }
 

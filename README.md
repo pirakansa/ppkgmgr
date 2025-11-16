@@ -25,7 +25,7 @@ $ ppkgmgr ver  # Display version information
 
 `pkg up` reads the stored manifests under `~/.ppkgmgr`, refreshes them from their original sources when possible, and downloads all referenced files so local copies stay up to date. When the refreshed manifest has the same digest as the stored copy, downloads are skipped to avoid unnecessary work.
 
-Running `ppkgmgr dl` without additional flags now preserves any pre-existing files by moving them to `<filename>.bak` (or a numbered variant) before downloading replacements. Supply `-f`/`--force` when you want to skip this backup and overwrite files immediately.
+Running `ppkgmgr dl` without additional flags now preserves any pre-existing files by moving them to `<filename>.bak` (or a numbered variant) before downloading replacements. Supply `-f`/`--force` when you want to skip this backup and overwrite files immediately. The same safeguard applies when `pkg up` notices a digest-protected file has been modified locally or when `repo rm` deletes tracked files—those files are renamed to `.bak` variants so user changes stay recoverable.
 
 ## YAML Files
 
