@@ -8,7 +8,7 @@ LINUX_ARM    := linux-arm
 LINUX_ARM64  := linux-arm64
 WIN_AMD64    := win-amd64
 CMD_DIR      := ./cmd/$(PROJECT_NAME)
-VERSION      := 0.4.0
+VERSION      := 0.6.0
 GO_LDFLAGS   := -ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
 GO_TAGS      := osusergo netgo
 GO_TAG_FLAGS := -tags="$(GO_TAGS)"
@@ -18,7 +18,7 @@ all: build
 .PHONY: build
 build:
 	@mkdir -p $(HOSTDIR)
-	@go build $(GO_TAG_FLAGS) -o $(HOSTDIR)/ $(CMD_DIR)
+	@go build $(GO_TAG_FLAGS) $(GO_LDFLAGS) -o $(HOSTDIR)/ $(CMD_DIR)
 
 .PHONY: run
 run:
@@ -56,17 +56,11 @@ vet:
 
 .PHONY: staticcheck
 staticcheck:
-	@if ! command -v staticcheck >/dev/null 2>&1; then \
-		go install honnef.co/go/tools/cmd/staticcheck@latest; \
-	fi
-	@staticcheck ./...
+	@go tool staticcheck ./...
 
 .PHONY: govulncheck
 govulncheck:
-	@if ! command -v govulncheck >/dev/null 2>&1; then \
-		go install golang.org/x/vuln/cmd/govulncheck@latest; \
-	fi
-	@govulncheck -tags "$(GO_TAGS)" ./...
+	@go tool govulncheck -tags "$(GO_TAGS)" ./...
 
 .PHONY: lint
 lint: vet staticcheck

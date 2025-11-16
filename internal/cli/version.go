@@ -2,12 +2,18 @@ package cli
 
 import (
 	"fmt"
+	"runtime/debug"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
+const defaultVersion = "0.0.0"
+
 // Version is set by the main package prior to executing the CLI.
-var Version = "0.0.0"
+var Version = defaultVersion
+
+var buildInfoReader = debug.ReadBuildInfo
 
 // newVersionCmd reports CLI version details.
 func newVersionCmd() *cobra.Command {
@@ -19,8 +25,30 @@ func newVersionCmd() *cobra.Command {
 				fmt.Fprintln(cmd.ErrOrStderr(), "unexpected arguments")
 				return cliError{code: 1}
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Version : %s\n", Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "Version : %s\n", resolvedVersion())
 			return nil
 		},
 	}
+}
+
+func resolvedVersion() string {
+	if v := normalizedVersion(Version); v != "" {
+		return v
+	}
+
+	if info, ok := buildInfoReader(); ok {
+		if v := normalizedVersion(info.Main.Version); v != "" {
+			return v
+		}
+	}
+
+	return defaultVersion
+}
+
+func normalizedVersion(v string) string {
+	version := strings.TrimSpace(v)
+	if version == "" || version == "(devel)" || version == defaultVersion {
+		return ""
+	}
+	return version
 }

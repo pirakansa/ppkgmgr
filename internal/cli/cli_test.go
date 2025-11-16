@@ -10,11 +10,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
-	"ppkgmgr/internal/registry"
+	"github.com/pirakansa/ppkgmgr/internal/registry"
 
 	"github.com/zeebo/blake3"
 )
@@ -51,6 +52,32 @@ func TestRun_Version(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
 	if stdout.String() != "Version : 1.2.3\n" {
+		t.Fatalf("unexpected stdout: %q", stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_VersionUsesBuildInfo(t *testing.T) {
+	origVersion := Version
+	Version = defaultVersion
+	t.Cleanup(func() { Version = origVersion })
+
+	origReader := buildInfoReader
+	buildInfoReader = func() (*debug.BuildInfo, bool) {
+		return &debug.BuildInfo{
+			Main: debug.Module{Version: "v9.9.9"},
+		}, true
+	}
+	t.Cleanup(func() { buildInfoReader = origReader })
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"ver"}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stdout.String() != "Version : v9.9.9\n" {
 		t.Fatalf("unexpected stdout: %q", stdout.String())
 	}
 	if stderr.Len() != 0 {

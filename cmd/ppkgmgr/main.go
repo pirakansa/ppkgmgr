@@ -4,8 +4,8 @@ package main
 import (
 	"os"
 
-	"ppkgmgr/internal/cli"
-	"ppkgmgr/pkg/req"
+	"github.com/pirakansa/ppkgmgr/internal/cli"
+	"github.com/pirakansa/ppkgmgr/pkg/req"
 )
 
 // Version reports the build-time version string injected by ldflags.

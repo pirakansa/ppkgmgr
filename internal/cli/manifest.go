@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ppkgmgr/internal/data"
+	"github.com/pirakansa/ppkgmgr/internal/data"
 )
 
 // manifestTarget represents a file path generated from a manifest entry along
