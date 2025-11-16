@@ -2,12 +2,19 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zeebo/blake3"
 )
 
 // repoRoot returns the repository root relative to this package.
@@ -48,6 +55,26 @@ func runCommand(t *testing.T, env []string, args ...string) (string, string) {
 	return stdout.String(), stderr.String()
 }
 
+func blake3Hex(data []byte) string {
+	sum := blake3.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+func newLocalHTTPServer(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip: failed to listen on loopback: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: listener,
+		Config:   &http.Server{Handler: handler},
+	}
+	server.Start()
+	t.Cleanup(server.Close)
+	return server
+}
+
 func TestDownloadSpiderOutputsPlannedTargets(t *testing.T) {
 	env := os.Environ()
 	root := repoRoot(t)
@@ -68,6 +95,55 @@ func TestDownloadSpiderOutputsPlannedTargets(t *testing.T) {
 
 	if stdout != expected {
 		t.Fatalf("unexpected spider output\nwant:\n%s\ngot:\n%s", expected, stdout)
+	}
+}
+
+func TestDownloadCommandDownloadsFile(t *testing.T) {
+	fileData := []byte("e2e download data")
+	server := newLocalHTTPServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/tool.bin":
+			w.WriteHeader(http.StatusOK)
+			if _, err := w.Write(fileData); err != nil {
+				t.Fatalf("failed to write response: %v", err)
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+
+	targetDir := t.TempDir()
+	manifestPath := filepath.Join(t.TempDir(), "manifest.yml")
+	content := fmt.Sprintf("version: 2\nrepositories:\n  - url: %s\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n", server.URL, targetDir)
+	if err := os.WriteFile(manifestPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+
+	env := os.Environ()
+	if _, stderr := runCommand(t, env, "dl", manifestPath); stderr != "" {
+		t.Fatalf("unexpected stderr from dl: %s", stderr)
+	}
+
+	targetFile := filepath.Join(targetDir, "tool.bin")
+	data, err := os.ReadFile(targetFile)
+	if err != nil {
+		t.Fatalf("failed to read downloaded file: %v", err)
+	}
+	if !bytes.Equal(data, fileData) {
+		t.Fatalf("unexpected file contents %q", data)
+	}
+
+	// Running again without -f should create a backup with the original data.
+	if _, stderr := runCommand(t, env, "dl", manifestPath); stderr != "" {
+		t.Fatalf("unexpected stderr from second dl: %s", stderr)
+	}
+	backupPath := targetFile + ".bak"
+	backup, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("expected backup file %s: %v", backupPath, err)
+	}
+	if !bytes.Equal(backup, fileData) {
+		t.Fatalf("unexpected backup contents %q", backup)
 	}
 }
 
@@ -157,5 +233,78 @@ func TestRepoLifecycleCommands(t *testing.T) {
 	}
 	if len(registry.Entries) != 0 {
 		t.Fatalf("expected registry to be empty after removal, got %d entries", len(registry.Entries))
+	}
+}
+
+func TestPkgUpDownloadsAndBacksUpModifiedFiles(t *testing.T) {
+	fileData := []byte("pkg-up-data")
+	var manifestResponse string
+
+	server := newLocalHTTPServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/manifest.yml":
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, manifestResponse)
+		case "/tool.bin":
+			w.WriteHeader(http.StatusOK)
+			if _, err := w.Write(fileData); err != nil {
+				t.Fatalf("failed to write file response: %v", err)
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	targetDir := t.TempDir()
+	digest := blake3Hex(fileData)
+	manifestResponse = fmt.Sprintf("version: 2\nrepositories:\n  - url: %s\n    files:\n      - file_name: tool.bin\n        out_dir: %s\n        digest: %s\n", server.URL, targetDir, digest)
+
+	home := t.TempDir()
+	env := append(os.Environ(), "PPKGMGR_HOME="+home)
+
+	manifestURL := server.URL + "/manifest.yml"
+	if _, stderr := runCommand(t, env, "repo", "add", manifestURL); stderr != "" {
+		t.Fatalf("unexpected stderr from repo add: %s", stderr)
+	}
+
+	if _, stderr := runCommand(t, env, "pkg", "up"); stderr != "" {
+		t.Fatalf("unexpected stderr from pkg up: %s", stderr)
+	}
+
+	targetFile := filepath.Join(targetDir, "tool.bin")
+	data, err := os.ReadFile(targetFile)
+	if err != nil {
+		t.Fatalf("failed to read pkg up file: %v", err)
+	}
+	if !bytes.Equal(data, fileData) {
+		t.Fatalf("unexpected downloaded contents %q", data)
+	}
+
+	// Simulate user modification and ensure pkg up preserves it via backups.
+	userContent := []byte("user modification")
+	if err := os.WriteFile(targetFile, userContent, 0o644); err != nil {
+		t.Fatalf("failed to modify file: %v", err)
+	}
+
+	if _, stderr := runCommand(t, env, "pkg", "up"); stderr != "" {
+		t.Fatalf("unexpected stderr from pkg up after modification: %s", stderr)
+	}
+
+	backupPath := targetFile + ".bak"
+	backup, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("expected backup file %s: %v", backupPath, err)
+	}
+	if !bytes.Equal(backup, userContent) {
+		t.Fatalf("backup contents mismatch %q", backup)
+	}
+
+	data, err = os.ReadFile(targetFile)
+	if err != nil {
+		t.Fatalf("failed to read refreshed file: %v", err)
+	}
+	if !bytes.Equal(data, fileData) {
+		t.Fatalf("expected refreshed content %q got %q", fileData, data)
 	}
 }
