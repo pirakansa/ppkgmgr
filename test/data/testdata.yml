@@ -21,6 +21,8 @@ repositories:
       -
         file_name: index.html
         digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+        artifact_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        encoding: zstd
         rename: index2.html
         out_dir: ./tmp.test
 

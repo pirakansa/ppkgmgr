@@ -44,6 +44,8 @@ repositories:
       -
         file_name: <name of the file to download>
         digest: <optional BLAKE3 digest to verify the file>
+        artifact_digest: <optional BLAKE3 digest of the downloaded artifact before decoding>
+        encoding: <optional encoding name for downloaded artifacts (e.g., zstd)>
         out_dir: <output directory for the file>
         rename: <optional new name for the file>
 ```
@@ -51,6 +53,8 @@ repositories:
 ### Example YAML File
 
 For an example YAML file, refer to [testdata.yml](./test/data/testdata.yml).
+
+When `encoding` is provided, downloads are written to a temporary path, validated with `artifact_digest` when present, decoded into the final `rename`/`file_name` destination, and verified again with `digest`.
 
 You can embed environment variables into `out_dir`. For example, `out_dir: $HOME/.local/bin` downloads files under `~/.local/bin` in your home directory.
 
