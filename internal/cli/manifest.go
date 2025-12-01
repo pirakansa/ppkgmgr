@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/pirakansa/ppkgmgr/internal/data"
+	"github.com/pirakansa/ppkgmgr/pkg/req"
 )
 
 // manifestTarget represents a file path generated from a manifest entry along
@@ -61,21 +62,30 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 				}
 			}
 
-			if _, err := downloader(dlurl, dlpath); err != nil {
+			tmpFile, err := os.CreateTemp("", "ppkgmgr-*")
+			if err != nil {
+				fmt.Fprintf(stderr, "failed to create temp file for %s: %v\n", fs.FileName, err)
+				return cliError{code: 3}
+			}
+			tmpPath := tmpFile.Name()
+			tmpFile.Close()
+
+			if _, err := downloader(dlurl, tmpPath); err != nil {
 				fmt.Fprintf(stderr, "failed to download %s: %v\n", dlurl, err)
 				downloadErr = err
+				_ = os.Remove(tmpPath)
 				continue
 			}
 
-			if fs.Digest != "" {
-				match, actual, err := verifyDigest(dlpath, fs.Digest)
-				if err != nil {
-					fmt.Fprintf(stderr, "warning: failed to verify digest for %s: %v\n", dlpath, err)
-					continue
-				}
-				if !match {
-					fmt.Fprintf(stderr, "warning: digest mismatch for %s (expected %s, got %s)\n", dlpath, fs.Digest, actual)
-				}
+			if err := processDownloadedFile(fs, tmpPath, dlpath); err != nil {
+				fmt.Fprintf(stderr, "failed to process %s: %v\n", dlurl, err)
+				downloadErr = err
+				_ = os.Remove(tmpPath)
+				continue
+			}
+
+			if err := os.Remove(tmpPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				fmt.Fprintf(stderr, "warning: cleanup temp file %s: %v\n", tmpPath, err)
 			}
 		}
 	}
@@ -119,6 +129,42 @@ func manifestOutputPaths(fd data.FileData) ([]manifestTarget, error) {
 		}
 	}
 	return targets, nil
+}
+
+func processDownloadedFile(fs data.File, artifactPath, outputPath string) error {
+	if strings.TrimSpace(fs.ArtifactDigest) != "" {
+		match, actual, err := verifyDigest(artifactPath, fs.ArtifactDigest)
+		if err != nil {
+			return fmt.Errorf("verify artifact digest: %w", err)
+		}
+		if !match {
+			return fmt.Errorf("artifact digest mismatch: expected %s, got %s", fs.ArtifactDigest, actual)
+		}
+	}
+
+	if err := req.DecodeFile(fs.Encoding, artifactPath, outputPath); err != nil {
+		return fmt.Errorf("decode file: %w", err)
+	}
+
+	if strings.TrimSpace(fs.Digest) != "" {
+		match, actual, err := verifyDigest(outputPath, fs.Digest)
+		if err != nil {
+			return fmt.Errorf("verify digest: %w", err)
+		}
+		if !match {
+			return cleanupOutputFile(outputPath, fmt.Errorf("digest mismatch: expected %s, got %s", fs.Digest, actual))
+		}
+	}
+
+	return nil
+}
+
+// cleanupOutputFile removes the partially written output when verification fails.
+func cleanupOutputFile(path string, baseErr error) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%w (cleanup %s: %v)", baseErr, path, err)
+	}
+	return baseErr
 }
 
 // backupIfDigestMismatch backs up the file when a digest mismatch indicates

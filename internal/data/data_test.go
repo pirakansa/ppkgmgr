@@ -33,7 +33,7 @@ func TestParseSuccess(t *testing.T) {
 		t.Fatalf("expected 1 file, got %d", len(first.Files))
 	}
 	file := first.Files[0]
-	if file.FileName != "index.html" || file.OutDir != "./tmp.test" || file.Rename != "" || file.Digest != "" {
+	if file.FileName != "index.html" || file.OutDir != "./tmp.test" || file.Rename != "" || file.Digest != "" || file.ArtifactDigest != "" || file.Encoding != "" {
 		t.Fatalf("unexpected file data: %+v", file)
 	}
 
@@ -52,8 +52,17 @@ func TestParseSuccess(t *testing.T) {
 		t.Fatalf("unexpected digest in first file of second repo: %q", file.Digest)
 	}
 	file = second.Files[1]
-	if file.Rename != "index2.html" || file.Digest != strings.Repeat("f", 64) {
-		t.Fatalf("unexpected second file data in second repo: %+v", file)
+	if file.Rename != "index2.html" {
+		t.Fatalf("unexpected rename in second file: %+v", file)
+	}
+	if strings.TrimSpace(file.Digest) != strings.Repeat("f", 64) {
+		t.Fatalf("unexpected digest in second file: %+v", file)
+	}
+	if file.Encoding != "zstd" {
+		t.Fatalf("unexpected encoding in second file: %+v", file)
+	}
+	if artifact := strings.TrimSpace(file.ArtifactDigest); artifact != strings.Repeat("a", 64) {
+		t.Fatalf("unexpected artifact digest in second file (len=%d): %+v", len(artifact), file)
 	}
 
 	third := fd.Repo[2]

@@ -25,10 +25,12 @@ type Repositories struct {
 
 // File describes a downloadable file entry.
 type File struct {
-	FileName string `yaml:"file_name"`
-	Digest   string `yaml:"digest,omitempty"`
-	Rename   string `yaml:"rename,omitempty"`
-	OutDir   string `yaml:"out_dir"`
+	FileName       string `yaml:"file_name"`
+	Digest         string `yaml:"digest,omitempty"`
+	ArtifactDigest string `yaml:"artifact_digest,omitempty"`
+	Encoding       string `yaml:"encoding,omitempty"`
+	Rename         string `yaml:"rename,omitempty"`
+	OutDir         string `yaml:"out_dir"`
 }
 
 // Parse loads and decodes the manifest at the provided path.

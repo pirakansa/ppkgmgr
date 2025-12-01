@@ -35,6 +35,13 @@ func newLocalHTTPServer(t *testing.T, handler http.Handler) *httptest.Server {
 	return server
 }
 
+func expectTempDownloadPath(t *testing.T, path string) {
+	t.Helper()
+	if !strings.HasPrefix(path, os.TempDir()) {
+		t.Fatalf("unexpected download path %q", path)
+	}
+}
+
 func TestDefaultData(t *testing.T) {
 	if got := defaultData("", "fallback"); got != "fallback" {
 		t.Fatalf("expected fallback, got %q", got)
@@ -258,7 +265,8 @@ func TestRun_SpiderWithExpandedOutDir(t *testing.T) {
 func TestRun_DownloadSuccess(t *testing.T) {
 	dir := t.TempDir()
 	yamlPath := filepath.Join(dir, "config.yml")
-	content := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: ./out\n        rename: saved.txt\n"
+	outDir := filepath.Join(dir, "out")
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: %s\n        rename: saved.txt\n", outDir)
 	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write yaml: %v", err)
 	}
@@ -270,8 +278,9 @@ func TestRun_DownloadSuccess(t *testing.T) {
 		if url != "https://example.com/file.txt" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != filepath.Join("./out", "saved.txt") {
-			t.Fatalf("unexpected path %q", path)
+		expectTempDownloadPath(t, path)
+		if err := os.WriteFile(path, []byte("downloaded"), 0o644); err != nil {
+			return 0, err
 		}
 		return 123, nil
 	}
@@ -283,6 +292,14 @@ func TestRun_DownloadSuccess(t *testing.T) {
 	if !called {
 		t.Fatalf("expected downloader to be called")
 	}
+	downloadedPath := filepath.Join(outDir, "saved.txt")
+	data, err := os.ReadFile(downloadedPath)
+	if err != nil {
+		t.Fatalf("expected downloaded file to exist: %v", err)
+	}
+	if string(data) != "downloaded" {
+		t.Fatalf("unexpected file contents: %q", string(data))
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", stderr.String())
 	}
@@ -291,22 +308,29 @@ func TestRun_DownloadSuccess(t *testing.T) {
 func TestRun_DownloadAbsoluteRename(t *testing.T) {
 	dir := t.TempDir()
 	yamlPath := filepath.Join(dir, "config.yml")
-	content := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: ./out\n        rename: /etc/passwd\n"
+	outDir := filepath.Join(dir, "out")
+	content := fmt.Sprintf("repositories:\n  - url: https://example.com\n    files:\n      - file_name: file.txt\n        out_dir: %s\n        rename: /etc/passwd\n", outDir)
 	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write yaml: %v", err)
 	}
 
 	var stdout, stderr bytes.Buffer
 	downloader := func(url, path string) (int64, error) {
-		if path != filepath.Join("./out", "etc/passwd") {
-			t.Fatalf("unexpected path %q", path)
-		}
-		return 0, nil
+		expectTempDownloadPath(t, path)
+		return 0, os.WriteFile(path, []byte("renamed"), 0o644)
 	}
 
 	exitCode := Run([]string{"dl", yamlPath}, &stdout, &stderr, downloader)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	renamedPath := filepath.Join(outDir, "etc/passwd")
+	data, err := os.ReadFile(renamedPath)
+	if err != nil {
+		t.Fatalf("expected renamed file to exist: %v", err)
+	}
+	if string(data) != "renamed" {
+		t.Fatalf("unexpected renamed contents: %q", string(data))
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", stderr.String())
@@ -314,12 +338,13 @@ func TestRun_DownloadAbsoluteRename(t *testing.T) {
 }
 
 func TestRun_RemoteYAML(t *testing.T) {
+	outDir := filepath.Join(t.TempDir(), "out")
 	server := newLocalHTTPServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/config.yml" {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprint(w, "repositories:\n  - url: https://example.com\n    files:\n      - file_name: remote.txt\n        out_dir: ./out\n")
+		fmt.Fprintf(w, "repositories:\n  - url: https://example.com\n    files:\n      - file_name: remote.txt\n        out_dir: %s\n", outDir)
 	}))
 
 	var stdout, stderr bytes.Buffer
@@ -329,10 +354,8 @@ func TestRun_RemoteYAML(t *testing.T) {
 		if url != "https://example.com/remote.txt" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != filepath.Join("./out", "remote.txt") {
-			t.Fatalf("unexpected path %q", path)
-		}
-		return 1, nil
+		expectTempDownloadPath(t, path)
+		return 1, os.WriteFile(path, []byte("remote"), 0o644)
 	}
 
 	exitCode := Run([]string{"dl", server.URL + "/config.yml"}, &stdout, &stderr, downloader)
@@ -341,6 +364,10 @@ func TestRun_RemoteYAML(t *testing.T) {
 	}
 	if !called {
 		t.Fatalf("expected downloader to be called")
+	}
+	remotePath := filepath.Join(outDir, "remote.txt")
+	if data, err := os.ReadFile(remotePath); err != nil || string(data) != "remote" {
+		t.Fatalf("unexpected remote output (err=%v, data=%q)", err, string(data))
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", stderr.String())
@@ -388,9 +415,7 @@ func TestRun_DownloadDigestMatch(t *testing.T) {
 		if url != "https://example.com/file.txt" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != filepath.Join(dir, "file.txt") {
-			t.Fatalf("unexpected path %q", path)
-		}
+		expectTempDownloadPath(t, path)
 		if err := os.WriteFile(path, fileContent, 0o644); err != nil {
 			return 0, err
 		}
@@ -403,6 +428,10 @@ func TestRun_DownloadDigestMatch(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+	outputPath := filepath.Join(dir, "file.txt")
+	if data, err := os.ReadFile(outputPath); err != nil || !bytes.Equal(data, fileContent) {
+		t.Fatalf("unexpected output file (err=%v, data=%q)", err, string(data))
 	}
 }
 
@@ -420,9 +449,7 @@ func TestRun_DownloadDigestMismatch(t *testing.T) {
 		if url != "https://example.com/file.txt" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != filepath.Join(dir, "file.txt") {
-			t.Fatalf("unexpected path %q", path)
-		}
+		expectTempDownloadPath(t, path)
 		if err := os.WriteFile(path, fileContent, 0o644); err != nil {
 			return 0, err
 		}
@@ -430,11 +457,11 @@ func TestRun_DownloadDigestMismatch(t *testing.T) {
 	}
 
 	exitCode := Run([]string{"dl", yamlPath}, &stdout, &stderr, downloader)
-	if exitCode != 0 {
-		t.Fatalf("expected exit code 0, got %d", exitCode)
+	if exitCode != 4 {
+		t.Fatalf("expected exit code 4, got %d", exitCode)
 	}
-	if !strings.Contains(stderr.String(), "warning: digest mismatch") {
-		t.Fatalf("expected digest mismatch warning, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "digest mismatch") {
+		t.Fatalf("expected digest mismatch message, got %q", stderr.String())
 	}
 }
 
@@ -874,9 +901,7 @@ func TestRunPkgUp_RefreshAndDownload(t *testing.T) {
 		if url != "https://example.com/tool.bin" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != downloadedPath {
-			t.Fatalf("unexpected download path %q", path)
-		}
+		expectTempDownloadPath(t, path)
 		if err := os.WriteFile(path, []byte("tool-data"), 0o644); err != nil {
 			return 0, err
 		}
@@ -1187,8 +1212,9 @@ func TestRunPkgUp_RedownloadFlagDownloadsWhenDigestMatches(t *testing.T) {
 		if url != "https://example.com/tool.bin" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != filepath.Join(outDir, "tool.bin") {
-			t.Fatalf("unexpected download path %q", path)
+		expectTempDownloadPath(t, path)
+		if err := os.WriteFile(path, []byte("tool-data"), 0o644); err != nil {
+			return 0, err
 		}
 		downloaded = true
 		return 0, nil
@@ -1254,9 +1280,7 @@ func TestRunPkgUp_RedownloadWhenNeverUpdated(t *testing.T) {
 		if url != "https://example.com/tool.bin" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != filepath.Join(outDir, "tool.bin") {
-			t.Fatalf("unexpected download path %q", path)
-		}
+		expectTempDownloadPath(t, path)
 		if err := os.WriteFile(path, []byte("tool-data"), 0o644); err != nil {
 			return 0, err
 		}
@@ -1331,9 +1355,7 @@ func TestRunPkgUp_RemovesOldYamlOnChange(t *testing.T) {
 		if url != "https://example.com/pkg-new.yml" {
 			t.Fatalf("unexpected url %q", url)
 		}
-		if path != newFile {
-			t.Fatalf("unexpected download path %q", path)
-		}
+		expectTempDownloadPath(t, path)
 		if err := os.WriteFile(path, []byte("fresh"), 0o644); err != nil {
 			return 0, err
 		}
