@@ -143,6 +143,11 @@ func TestDownloadManifestFiles_DigestMismatch(t *testing.T) {
 	if !strings.Contains(stderr.String(), "digest mismatch") {
 		t.Fatalf("expected digest mismatch message, got %q", stderr.String())
 	}
+
+	outputPath := filepath.Join(outDir, "artifact.zst")
+	if _, statErr := os.Stat(outputPath); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("expected %s to be removed, got stat err = %v", outputPath, statErr)
+	}
 }
 
 func TestDownloadManifestFiles_UnsupportedEncoding(t *testing.T) {

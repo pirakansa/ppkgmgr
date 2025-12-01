@@ -152,11 +152,19 @@ func processDownloadedFile(fs data.File, artifactPath, outputPath string) error 
 			return fmt.Errorf("verify digest: %w", err)
 		}
 		if !match {
-			return fmt.Errorf("digest mismatch: expected %s, got %s", fs.Digest, actual)
+			return cleanupOutputFile(outputPath, fmt.Errorf("digest mismatch: expected %s, got %s", fs.Digest, actual))
 		}
 	}
 
 	return nil
+}
+
+// cleanupOutputFile removes the partially written output when verification fails.
+func cleanupOutputFile(path string, baseErr error) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%w (cleanup %s: %v)", baseErr, path, err)
+	}
+	return baseErr
 }
 
 // backupIfDigestMismatch backs up the file when a digest mismatch indicates
