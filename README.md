@@ -27,6 +27,8 @@ $ ppkgmgr dig <path_to_file>  # Show the BLAKE3 digest for a file
 
 `pkg up` reads the stored manifests under `~/.ppkgmgr`, refreshes them from their original sources when possible, and downloads all referenced files so local copies stay up to date. When the refreshed manifest has the same digest as the stored copy, downloads are skipped to avoid unnecessary work. Pass `--redownload` when you want to bypass the digest check and download anyway; this does **not** disable the backup behavior described below.
 
+Set the `PPKGMGR_HOME` environment variable when you need to relocate the internal state directory (defaults to `~/.ppkgmgr`). This applies to commands such as `repo add`, `repo ls`, `repo rm`, and `pkg up` that read or write registry data and stored manifests.
+
 Running `ppkgmgr dl` without additional flags now preserves any pre-existing files by moving them to `<filename>.bak` (or a numbered variant) before downloading replacements. Supply `-o`/`--overwrite` when you want to skip this backup and overwrite files immediately. The same safeguard applies when `pkg up` notices a digest-protected file has been modified locally (even if `--redownload` is used) or when `repo rm` deletes tracked files—those files are renamed to `.bak` variants so user changes stay recoverable. Files without digests are always overwritten because the tool cannot determine whether a user modification occurred, so keep backups yourself when working with digestless entries.
 
 ## YAML Files
