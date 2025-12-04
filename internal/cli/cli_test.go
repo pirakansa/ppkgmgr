@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/pirakansa/ppkgmgr/internal/registry"
 
 	"github.com/zeebo/blake3"
@@ -152,6 +153,100 @@ func TestRun_DigRequireArgument(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+}
+
+func TestRun_UtilZstd(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "input.txt")
+	content := []byte("compress me with zstd")
+	if err := os.WriteFile(src, content, 0o644); err != nil {
+		t.Fatalf("failed to write source file: %v", err)
+	}
+
+	dst := filepath.Join(dir, "artifacts", "output.zst")
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"util", "zstd", src, dst}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", exitCode, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	digestOutput := strings.TrimSpace(stdout.String())
+	if digestOutput == "" {
+		t.Fatalf("expected digest output, got empty string")
+	}
+
+	_, expectedDigest, err := verifyDigest(dst, "")
+	if err != nil {
+		t.Fatalf("failed to compute expected digest: %v", err)
+	}
+	if digestOutput != expectedDigest {
+		t.Fatalf("expected digest %q, got %q", expectedDigest, digestOutput)
+	}
+
+	compressedData, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read compressed file: %v", err)
+	}
+
+	decoder, err := zstd.NewReader(nil)
+	if err != nil {
+		t.Fatalf("failed to create decoder: %v", err)
+	}
+	decompressed, err := decoder.DecodeAll(compressedData, nil)
+	decoder.Close()
+	if err != nil {
+		t.Fatalf("failed to decompress data: %v", err)
+	}
+	if string(decompressed) != string(content) {
+		t.Fatalf("unexpected decompressed content: got %q, want %q", decompressed, content)
+	}
+}
+
+func TestRun_UtilZstdMissingInput(t *testing.T) {
+	tempDir := t.TempDir()
+	missingSrc := filepath.Join(tempDir, "missing.txt")
+	dst := filepath.Join(tempDir, "output.zst")
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"util", "zstd", missingSrc, dst}, &stdout, &stderr, nil)
+	if exitCode != 5 {
+		t.Fatalf("expected exit code 5, got %d", exitCode)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "failed to open source") {
+		t.Fatalf("expected source error, got %q", stderr.String())
+	}
+}
+
+func TestRun_UtilZstdUnwritableDestination(t *testing.T) {
+	tempDir := t.TempDir()
+	blocked := filepath.Join(tempDir, "blocked")
+	if err := os.WriteFile(blocked, []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("failed to set up blocked path: %v", err)
+	}
+
+	src := filepath.Join(tempDir, "input.txt")
+	if err := os.WriteFile(src, []byte("data"), 0o644); err != nil {
+		t.Fatalf("failed to write source file: %v", err)
+	}
+
+	dst := filepath.Join(blocked, "output.zst")
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"util", "zstd", src, dst}, &stdout, &stderr, nil)
+	if exitCode != 5 {
+		t.Fatalf("expected exit code 5, got %d", exitCode)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "failed to create destination directory") {
+		t.Fatalf("expected destination directory error, got %q", stderr.String())
 	}
 }
 

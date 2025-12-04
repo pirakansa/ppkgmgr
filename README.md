@@ -21,6 +21,7 @@ $ ppkgmgr pkg up  # Refresh stored manifests under ~/.ppkgmgr and redownload the
 $ ppkgmgr pkg up --redownload  # Refresh and download even when manifest digests match (backups still apply when possible)
 $ ppkgmgr ver  # Display version information
 $ ppkgmgr dig <path_to_file>  # Show the BLAKE3 digest for a file
+$ ppkgmgr util zstd <src> <dst>  # Compress a file with zstd and print the resulting digest
 ```
 
 `repo add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. Use `repo ls` to inspect saved manifests and `repo rm` when you want to delete an entry. This registry will later be used by commands such as `repo fetch` to detect changes.
@@ -30,6 +31,15 @@ $ ppkgmgr dig <path_to_file>  # Show the BLAKE3 digest for a file
 Set the `PPKGMGR_HOME` environment variable when you need to relocate the internal state directory (defaults to `~/.ppkgmgr`). This applies to commands such as `repo add`, `repo ls`, `repo rm`, and `pkg up` that read or write registry data and stored manifests.
 
 Running `ppkgmgr dl` without additional flags now preserves any pre-existing files by moving them to `<filename>.bak` (or a numbered variant) before downloading replacements. Supply `-o`/`--overwrite` when you want to skip this backup and overwrite files immediately. The same safeguard applies when `pkg up` notices a digest-protected file has been modified locally (even if `--redownload` is used) or when `repo rm` deletes tracked files—those files are renamed to `.bak` variants so user changes stay recoverable. Files without digests are always overwritten because the tool cannot determine whether a user modification occurred, so keep backups yourself when working with digestless entries.
+
+### Authoring manifests for compressed artifacts
+
+Use `ppkgmgr util zstd` to produce zstd-compressed artifacts and capture their digests for manifest entries:
+
+1. Prepare the file you want to publish (for example, a binary build output).
+2. Run `ppkgmgr util zstd /path/to/input /path/to/output.zst`. The command creates parent directories as needed, writes the compressed file, and prints its BLAKE3 digest to stdout.
+3. Copy the printed digest into the `artifact_digest` field of your manifest entry so `ppkgmgr` can verify the downloaded archive before decoding.
+4. If the manifest also tracks the decoded file content, run `ppkgmgr dig` on the decompressed output and place that digest under the entry's `digest` field.
 
 ## YAML Files
 

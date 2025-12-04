@@ -24,5 +24,6 @@ func newRootCmd(downloader DownloadFunc) *cobra.Command {
 	cmd.AddCommand(newPkgCmd(downloader))
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newDigCmd())
+	cmd.AddCommand(newUtilCmd())
 	return cmd
 }
