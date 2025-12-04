@@ -21,6 +21,7 @@ func newUtilCmd() *cobra.Command {
 		},
 	}
 
+	cmd.AddCommand(newDigCmd())
 	cmd.AddCommand(newZstdCmd())
 	return cmd
 }

@@ -14,7 +14,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-// newDigCmd wires the `dig` command for computing BLAKE3 digests.
+// newDigCmd wires the `util dig` command for computing BLAKE3 digests.
 func newDigCmd() *cobra.Command {
 	var format string
 	var mode string

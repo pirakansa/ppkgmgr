@@ -131,7 +131,7 @@ func TestRun_Dig(t *testing.T) {
 	expected := hex.EncodeToString(hasher[:])
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"dig", target}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"util", "dig", target}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -152,7 +152,7 @@ func TestRun_DigYAMLSnippet(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"dig", "--format", "yaml", target}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"util", "dig", "--format", "yaml", target}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -216,7 +216,7 @@ func TestRun_DigArtifactYAMLSnippet(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"dig", "--mode", "artifact", "--format", "yaml", artifact}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"util", "dig", "--mode", "artifact", "--format", "yaml", artifact}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -297,7 +297,7 @@ func TestRun_DigArtifactRaw(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"dig", "--mode", "artifact", artifact}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"util", "dig", "--mode", "artifact", artifact}, &stdout, &stderr, nil)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -326,7 +326,7 @@ func TestRun_DigInvalidMode(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"dig", "--mode", "unknown", path}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"util", "dig", "--mode", "unknown", path}, &stdout, &stderr, nil)
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
@@ -346,7 +346,7 @@ func TestRun_DigInvalidFormat(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"dig", "--format", "unknown", path}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"util", "dig", "--format", "unknown", path}, &stdout, &stderr, nil)
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
@@ -360,7 +360,7 @@ func TestRun_DigInvalidFormat(t *testing.T) {
 
 func TestRun_DigRequireArgument(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"dig"}, &stdout, &stderr, nil)
+	exitCode := Run([]string{"util", "dig"}, &stdout, &stderr, nil)
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
