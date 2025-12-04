@@ -1,19 +1,21 @@
-package cli
+package pkg
 
 import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 )
 
-// newPkgCmd provides manifest management helpers under the `pkg` namespace.
-func newPkgCmd(downloader DownloadFunc) *cobra.Command {
+// New provides manifest management helpers under the `pkg` namespace.
+func New(downloader shared.DownloadFunc) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pkg",
 		Short: "Operate on packages stored under ~/.ppkgmgr",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(cmd.ErrOrStderr(), "require pkg subcommand")
-			return cliError{code: 1}
+			return shared.Error{Code: 1}
 		},
 	}
 
@@ -21,8 +23,7 @@ func newPkgCmd(downloader DownloadFunc) *cobra.Command {
 	return cmd
 }
 
-// newPkgUpCmd installs the `pkg up` subcommand responsible for refreshing manifests.
-func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
+func newPkgUpCmd(downloader shared.DownloadFunc) *cobra.Command {
 	var redownload bool
 	cmd := &cobra.Command{
 		Use:   "up",
@@ -30,7 +31,7 @@ func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				fmt.Fprintln(cmd.ErrOrStderr(), "pkg up does not accept arguments")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 			return handlePkgUp(cmd, downloader, redownload)
 		},
@@ -39,8 +40,7 @@ func newPkgUpCmd(downloader DownloadFunc) *cobra.Command {
 	return cmd
 }
 
-// handlePkgUp executes the `pkg up` workflow using the cobra command context.
-func handlePkgUp(cmd *cobra.Command, downloader DownloadFunc, redownload bool) error {
+func handlePkgUp(cmd *cobra.Command, downloader shared.DownloadFunc, redownload bool) error {
 	updater := pkgUpdater{
 		downloader: downloader,
 		stdout:     cmd.OutOrStdout(),

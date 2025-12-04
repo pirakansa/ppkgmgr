@@ -1,4 +1,4 @@
-package cli
+package repo
 
 import (
 	"errors"
@@ -10,20 +10,22 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/spf13/cobra"
+
+	"github.com/pirakansa/ppkgmgr/internal/cli/manifest"
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 	"github.com/pirakansa/ppkgmgr/internal/data"
 	"github.com/pirakansa/ppkgmgr/internal/registry"
-
-	"github.com/spf13/cobra"
 )
 
-// newRepoCmd constructs the `repo` command used to manage manifest metadata.
-func newRepoCmd() *cobra.Command {
+// New constructs the `repo` command used to manage manifest metadata.
+func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "repo",
 		Short: "Manage stored manifests",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(cmd.ErrOrStderr(), "require repo subcommand")
-			return cliError{code: 1}
+			return shared.Error{Code: 1}
 		},
 	}
 
@@ -33,7 +35,6 @@ func newRepoCmd() *cobra.Command {
 	return cmd
 }
 
-// newRepoAddCmd registers new manifests with the local registry.
 func newRepoAddCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "add <manifest>",
@@ -41,14 +42,13 @@ func newRepoAddCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				fmt.Fprintln(cmd.ErrOrStderr(), "require manifest path or URL argument")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 			return handleRepoAdd(cmd, args[0])
 		},
 	}
 }
 
-// newRepoLsCmd lists the manifests recorded in the registry.
 func newRepoLsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "ls",
@@ -56,14 +56,13 @@ func newRepoLsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				fmt.Fprintln(cmd.ErrOrStderr(), "repo ls does not accept arguments")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 			return handleRepoLs(cmd)
 		},
 	}
 }
 
-// newRepoRmCmd removes manifests from the registry.
 func newRepoRmCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rm <id_or_source>",
@@ -71,14 +70,13 @@ func newRepoRmCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				fmt.Fprintln(cmd.ErrOrStderr(), "require manifest ID or source argument")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 			return handleRepoRm(cmd, args[0])
 		},
 	}
 }
 
-// handleRepoAdd processes the `repo add` workflow.
 func handleRepoAdd(cmd *cobra.Command, source string) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
@@ -88,7 +86,7 @@ func handleRepoAdd(cmd *cobra.Command, source string) error {
 	normalizedSource, err := resolveManifestSource(originalSource)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to resolve manifest path: %v\n", err)
-		return cliError{code: 3}
+		return shared.Error{Code: 3}
 	}
 
 	source = normalizedSource
@@ -96,43 +94,43 @@ func handleRepoAdd(cmd *cobra.Command, source string) error {
 	raw, err := data.LoadRaw(source)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to load manifest: %v\n", err)
-		return cliError{code: 3}
+		return shared.Error{Code: 3}
 	}
 
-	root, err := storageDir()
+	root, err := shared.StorageDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to determine storage directory: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	manifestDir := filepath.Join(root, "manifests")
 	if err := os.MkdirAll(manifestDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "failed to prepare manifest directory: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
-	target := filepath.Join(manifestDir, backupFileName(source))
+	target := filepath.Join(manifestDir, shared.BackupFileName(source))
 	if err := os.WriteFile(target, raw, 0o600); err != nil {
 		fmt.Fprintf(stderr, "failed to write backup: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
-	_, digest, err := verifyDigest(target, "")
+	_, digest, err := shared.VerifyDigest(target, "")
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to compute digest: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	registryPath := filepath.Join(root, "registry.json")
 	store, err := registry.Load(registryPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to load registry: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
-	entryID := generateEntryID(source)
+	entryID := shared.GenerateEntryID(source)
 	existing, ok := store.GetBySource(source)
-	if !ok && !isRemotePath(originalSource) {
+	if !ok && !shared.IsRemotePath(originalSource) {
 		candidates := []string{originalSource}
 		if cleaned := filepath.Clean(originalSource); cleaned != "" && cleaned != originalSource {
 			candidates = append(candidates, cleaned)
@@ -166,29 +164,28 @@ func handleRepoAdd(cmd *cobra.Command, source string) error {
 
 	if err := store.Save(registryPath); err != nil {
 		fmt.Fprintf(stderr, "failed to save registry: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	fmt.Fprintf(stdout, "registered manifest: %s\n", target)
 	return nil
 }
 
-// handleRepoLs processes the `repo ls` workflow.
 func handleRepoLs(cmd *cobra.Command) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
-	root, err := storageDir()
+	root, err := shared.StorageDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to determine storage directory: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	registryPath := filepath.Join(root, "registry.json")
 	store, err := registry.Load(registryPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to load registry: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	if len(store.Entries) == 0 {
@@ -221,38 +218,37 @@ func handleRepoLs(cmd *cobra.Command) error {
 	}
 	if err := table.Flush(); err != nil {
 		fmt.Fprintf(stderr, "failed to write manifest list: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 	return nil
 }
 
-// handleRepoRm processes the `repo rm` workflow.
 func handleRepoRm(cmd *cobra.Command, selector string) error {
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
-	root, err := storageDir()
+	root, err := shared.StorageDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to determine storage directory: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	registryPath := filepath.Join(root, "registry.json")
 	store, err := registry.Load(registryPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to load registry: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	entry, ok := removeRegistryEntry(&store, strings.TrimSpace(selector))
 	if !ok {
 		fmt.Fprintf(stderr, "no manifest found for %q\n", selector)
-		return cliError{code: 2}
+		return shared.Error{Code: 2}
 	}
 
-	var targets []manifestTarget
+	var targets []manifest.Target
 	if entry.LocalPath != "" {
-		if manifestTargets, err := extractManifestTargets(entry.LocalPath); err == nil {
+		if manifestTargets, err := manifest.ExtractTargets(entry.LocalPath); err == nil {
 			targets = manifestTargets
 		} else if !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stderr, "warning: failed to parse manifest %s: %v\n", displayValue(entry.Source), err)
@@ -262,26 +258,25 @@ func handleRepoRm(cmd *cobra.Command, selector string) error {
 	if entry.LocalPath != "" {
 		if err := os.Remove(entry.LocalPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stderr, "failed to remove manifest file: %v\n", err)
-			return cliError{code: 5}
+			return shared.Error{Code: 5}
 		}
 	}
 
 	if len(targets) != 0 {
-		cleanupOldTargets(targets, stderr)
+		manifest.CleanupOldTargets(targets, stderr)
 	}
 
 	if err := store.Save(registryPath); err != nil {
 		fmt.Fprintf(stderr, "failed to save registry: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	fmt.Fprintf(stdout, "removed manifest: %s\n", displayValue(entry.Source))
 	return nil
 }
 
-// resolveManifestSource normalises manifest references to canonical paths.
 func resolveManifestSource(source string) (string, error) {
-	if isRemotePath(source) {
+	if shared.IsRemotePath(source) {
 		return source, nil
 	}
 	if source == "" {
@@ -301,7 +296,6 @@ func resolveManifestSource(source string) (string, error) {
 	return abs, nil
 }
 
-// displayValue returns a printable value for tabular output.
 func displayValue(val string) string {
 	if strings.TrimSpace(val) == "" {
 		return "-"
@@ -309,7 +303,6 @@ func displayValue(val string) string {
 	return val
 }
 
-// formatUpdatedAt renders a timestamp suitable for CLI output.
 func formatUpdatedAt(t time.Time) string {
 	if t.IsZero() {
 		return "-"
@@ -317,7 +310,6 @@ func formatUpdatedAt(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
-// removeRegistryEntry removes a manifest by ID or source value.
 func removeRegistryEntry(store *registry.Store, selector string) (registry.Entry, bool) {
 	if selector == "" {
 		return registry.Entry{}, false

@@ -1,4 +1,4 @@
-package cli
+package util
 
 import (
 	"encoding/hex"
@@ -12,9 +12,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/zeebo/blake3"
 	yaml "gopkg.in/yaml.v3"
+
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 )
 
-// newDigCmd wires the `dig` command for computing BLAKE3 digests.
 func newDigCmd() *cobra.Command {
 	var format string
 	var mode string
@@ -28,21 +29,21 @@ func newDigCmd() *cobra.Command {
 
 			if len(args) == 0 {
 				fmt.Fprintln(stderr, "require file path argument")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 			if len(args) > 1 {
 				fmt.Fprintln(stderr, "unexpected arguments")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 
-			path, err := expandPath(args[0])
+			path, err := shared.ExpandPath(args[0])
 			if err != nil {
 				fmt.Fprintf(stderr, "failed to expand path: %v\n", err)
-				return cliError{code: 5}
+				return shared.Error{Code: 5}
 			}
 			if path == "" {
 				fmt.Fprintln(stderr, "require file path argument")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 
 			switch strings.ToLower(mode) {
@@ -52,7 +53,7 @@ func newDigCmd() *cobra.Command {
 				return digArtifact(stdout, stderr, path, format)
 			default:
 				fmt.Fprintf(stderr, "invalid mode %q (expected file or artifact)\n", mode)
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 		},
 	}
@@ -63,10 +64,10 @@ func newDigCmd() *cobra.Command {
 }
 
 func digFile(stdout, stderr io.Writer, path, format string) error {
-	_, digest, err := verifyDigest(path, "")
+	_, digest, err := shared.VerifyDigest(path, "")
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to compute digest: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	switch strings.ToLower(format) {
@@ -79,27 +80,27 @@ func digFile(stdout, stderr io.Writer, path, format string) error {
 			Digest:   digest,
 		}); err != nil {
 			fmt.Fprintf(stderr, "failed to render yaml: %v\n", err)
-			return cliError{code: 5}
+			return shared.Error{Code: 5}
 		}
 	default:
 		fmt.Fprintf(stderr, "invalid format %q (expected raw or yaml)\n", format)
-		return cliError{code: 1}
+		return shared.Error{Code: 1}
 	}
 
 	return nil
 }
 
 func digArtifact(stdout, stderr io.Writer, path, format string) error {
-	_, artifactDigest, err := verifyDigest(path, "")
+	_, artifactDigest, err := shared.VerifyDigest(path, "")
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to compute artifact digest: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	contentDigest, err := digestZstdContent(path)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to compute decoded digest: %v\n", err)
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	switch strings.ToLower(format) {
@@ -114,11 +115,11 @@ func digArtifact(stdout, stderr io.Writer, path, format string) error {
 			Encoding:       "zstd",
 		}); err != nil {
 			fmt.Fprintf(stderr, "failed to render yaml: %v\n", err)
-			return cliError{code: 5}
+			return shared.Error{Code: 5}
 		}
 	default:
 		fmt.Fprintf(stderr, "invalid format %q (expected raw or yaml)\n", format)
-		return cliError{code: 1}
+		return shared.Error{Code: 1}
 	}
 
 	return nil

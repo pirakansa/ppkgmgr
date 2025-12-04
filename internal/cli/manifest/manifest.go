@@ -1,4 +1,4 @@
-package cli
+package manifest
 
 import (
 	"errors"
@@ -8,36 +8,37 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 	"github.com/pirakansa/ppkgmgr/internal/data"
 	"github.com/pirakansa/ppkgmgr/pkg/req"
 )
 
-// manifestTarget represents a file path generated from a manifest entry along
+// Target represents a file path generated from a manifest entry along
 // with metadata required for cleanup decisions.
-type manifestTarget struct {
-	path   string
-	digest string
+type Target struct {
+	Path   string
+	Digest string
 }
 
-// downloadManifestFiles walks through every file defined in the manifest and
+// DownloadFiles walks through every file defined in the manifest and
 // downloads them using the provided downloader. When spider is true, only the
 // planned download operations are printed. When forceOverwrite is true but
 // safeguardForced is also true, digest-protected files are backed up before
 // overwriting to preserve user changes.
-func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite, safeguardForced bool) error {
+func DownloadFiles(fd data.FileData, downloader shared.DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite, safeguardForced bool) error {
 	if downloader == nil && !spider {
 		fmt.Fprintln(stderr, "downloader is required")
-		return cliError{code: 5}
+		return shared.Error{Code: 5}
 	}
 
 	var downloadErr error
 	for _, repo := range fd.Repo {
 		for _, fs := range repo.Files {
 			dlurl := fmt.Sprintf("%s/%s", repo.Url, fs.FileName)
-			dlpath, err := resolveDownloadPath(fs)
+			dlpath, err := ResolvePath(fs)
 			if err != nil {
 				fmt.Fprintf(stderr, "failed to determine download path for %s: %v\n", fs.FileName, err)
-				return cliError{code: 3}
+				return shared.Error{Code: 3}
 			}
 			if spider {
 				fmt.Fprintf(stdout, "%s   %s\n", dlurl, dlpath)
@@ -45,17 +46,17 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 			}
 
 			if !forceOverwrite {
-				if backupPath, err := backupOutputIfExists(dlpath); err != nil {
+				if backupPath, err := shared.BackupOutputIfExists(dlpath); err != nil {
 					fmt.Fprintf(stderr, "failed to backup %s: %v\n", dlpath, err)
-					return cliError{code: 3}
+					return shared.Error{Code: 3}
 				} else if backupPath != "" {
 					fmt.Fprintf(stderr, "backed up %s to %s\n", dlpath, backupPath)
 				}
 			} else if safeguardForced && strings.TrimSpace(fs.Digest) != "" {
-				if backupPath, err := backupIfDigestMismatch(dlpath, fs.Digest); err != nil {
+				if backupPath, err := shared.BackupIfDigestMismatch(dlpath, fs.Digest); err != nil {
 					if !errors.Is(err, os.ErrNotExist) {
 						fmt.Fprintf(stderr, "failed to verify existing %s: %v\n", dlpath, err)
-						return cliError{code: 3}
+						return shared.Error{Code: 3}
 					}
 				} else if backupPath != "" {
 					fmt.Fprintf(stderr, "backed up %s to %s\n", dlpath, backupPath)
@@ -65,7 +66,7 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 			tmpFile, err := os.CreateTemp("", "ppkgmgr-*")
 			if err != nil {
 				fmt.Fprintf(stderr, "failed to create temp file for %s: %v\n", fs.FileName, err)
-				return cliError{code: 3}
+				return shared.Error{Code: 3}
 			}
 			tmpPath := tmpFile.Name()
 			tmpFile.Close()
@@ -91,21 +92,21 @@ func downloadManifestFiles(fd data.FileData, downloader DownloadFunc, stdout, st
 	}
 
 	if downloadErr != nil {
-		return cliError{code: 4}
+		return shared.Error{Code: 4}
 	}
 	return nil
 }
 
-// resolveDownloadPath returns the output path for a manifest entry, ensuring
+// ResolvePath returns the output path for a manifest entry, ensuring
 // that the resulting path is safe to use on the local filesystem.
-func resolveDownloadPath(fs data.File) (string, error) {
-	outdir := defaultData(fs.OutDir, ".")
-	expandedDir, err := expandPath(outdir)
+func ResolvePath(fs data.File) (string, error) {
+	outdir := shared.DefaultData(fs.OutDir, ".")
+	expandedDir, err := shared.ExpandPath(outdir)
 	if err != nil {
 		return "", fmt.Errorf("expand output directory %q: %w", outdir, err)
 	}
 	outdir = expandedDir
-	outname := defaultData(fs.Rename, fs.FileName)
+	outname := shared.DefaultData(fs.Rename, fs.FileName)
 	if filepath.IsAbs(outname) {
 		outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
 		outname = strings.TrimLeft(outname, "/\\")
@@ -113,27 +114,88 @@ func resolveDownloadPath(fs data.File) (string, error) {
 	return filepath.Join(outdir, outname), nil
 }
 
-// manifestOutputPaths collects all output paths declared in the manifest.
-func manifestOutputPaths(fd data.FileData) ([]manifestTarget, error) {
-	var targets []manifestTarget
+// Targets collects all output paths declared in the manifest.
+func Targets(fd data.FileData) ([]Target, error) {
+	var targets []Target
 	for _, repo := range fd.Repo {
 		for _, fs := range repo.Files {
-			path, err := resolveDownloadPath(fs)
+			path, err := ResolvePath(fs)
 			if err != nil {
 				return nil, err
 			}
-			targets = append(targets, manifestTarget{
-				path:   path,
-				digest: strings.TrimSpace(fs.Digest),
+			targets = append(targets, Target{
+				Path:   path,
+				Digest: strings.TrimSpace(fs.Digest),
 			})
 		}
 	}
 	return targets, nil
 }
 
+// ExtractTargets parses the manifest and collects all output paths.
+func ExtractTargets(path string) ([]Target, error) {
+	fd, err := data.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+	return Targets(fd)
+}
+
+// CleanupOldTargets removes any outdated files referenced by a manifest.
+func CleanupOldTargets(targets []Target, stderr io.Writer) {
+	for _, target := range targets {
+		if backupPath, err := shared.BackupIfDigestMismatch(target.Path, target.Digest); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				fmt.Fprintf(stderr, "warning: failed to safeguard %s: %v\n", target.Path, err)
+			}
+			continue
+		} else if backupPath != "" {
+			fmt.Fprintf(stderr, "backed up %s to %s\n", target.Path, backupPath)
+			continue
+		}
+		if err := os.Remove(target.Path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stderr, "warning: failed to remove outdated file %s: %v\n", target.Path, err)
+		}
+	}
+}
+
+// FilesNeedRefresh reports whether any manifest target is missing or fails its digest.
+func FilesNeedRefresh(fd data.FileData) (bool, error) {
+	for _, repo := range fd.Repo {
+		for _, fs := range repo.Files {
+			path, err := ResolvePath(fs)
+			if err != nil {
+				return false, fmt.Errorf("resolve output path for %s: %w", fs.FileName, err)
+			}
+			info, err := os.Stat(path)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					return true, nil
+				}
+				return false, fmt.Errorf("stat %s: %w", path, err)
+			}
+			if info.IsDir() {
+				return true, nil
+			}
+			digest := strings.TrimSpace(fs.Digest)
+			if digest == "" {
+				continue
+			}
+			match, _, err := shared.VerifyDigest(path, digest)
+			if err != nil {
+				return false, fmt.Errorf("verify digest for %s: %w", path, err)
+			}
+			if !match {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func processDownloadedFile(fs data.File, artifactPath, outputPath string) error {
 	if strings.TrimSpace(fs.ArtifactDigest) != "" {
-		match, actual, err := verifyDigest(artifactPath, fs.ArtifactDigest)
+		match, actual, err := shared.VerifyDigest(artifactPath, fs.ArtifactDigest)
 		if err != nil {
 			return fmt.Errorf("verify artifact digest: %w", err)
 		}
@@ -147,7 +209,7 @@ func processDownloadedFile(fs data.File, artifactPath, outputPath string) error 
 	}
 
 	if strings.TrimSpace(fs.Digest) != "" {
-		match, actual, err := verifyDigest(outputPath, fs.Digest)
+		match, actual, err := shared.VerifyDigest(outputPath, fs.Digest)
 		if err != nil {
 			return fmt.Errorf("verify digest: %w", err)
 		}
@@ -165,85 +227,4 @@ func cleanupOutputFile(path string, baseErr error) error {
 		return fmt.Errorf("%w (cleanup %s: %v)", baseErr, path, err)
 	}
 	return baseErr
-}
-
-// backupIfDigestMismatch backs up the file when a digest mismatch indicates
-// the user may have modified the contents manually.
-func backupIfDigestMismatch(path, expected string) (string, error) {
-	expected = strings.TrimSpace(expected)
-	if expected == "" {
-		return "", nil
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", nil
-		}
-		return "", fmt.Errorf("stat existing file: %w", err)
-	}
-	if info.IsDir() {
-		return "", fmt.Errorf("existing path %s is a directory", path)
-	}
-
-	match, _, err := verifyDigest(path, expected)
-	if err != nil {
-		return "", fmt.Errorf("verify digest: %w", err)
-	}
-	if match {
-		return "", nil
-	}
-
-	backupPath, err := nextBackupPath(path)
-	if err != nil {
-		return "", err
-	}
-	if err := os.Rename(path, backupPath); err != nil {
-		return "", fmt.Errorf("rename backup: %w", err)
-	}
-	return backupPath, nil
-}
-
-// backupOutputIfExists renames an existing file to a .bak variant so that
-// downloads don't clobber user data unless explicitly forced.
-func backupOutputIfExists(path string) (string, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", nil
-		}
-		return "", fmt.Errorf("stat existing file: %w", err)
-	}
-	if info.IsDir() {
-		return "", fmt.Errorf("existing path %s is a directory", path)
-	}
-
-	backupPath, err := nextBackupPath(path)
-	if err != nil {
-		return "", err
-	}
-	if err := os.Rename(path, backupPath); err != nil {
-		return "", fmt.Errorf("rename backup: %w", err)
-	}
-	return backupPath, nil
-}
-
-func nextBackupPath(path string) (string, error) {
-	candidate := path + ".bak"
-	if _, err := os.Stat(candidate); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return candidate, nil
-		}
-		return "", fmt.Errorf("stat backup candidate: %w", err)
-	}
-	for i := 1; i < 1000; i++ {
-		candidate = fmt.Sprintf("%s.bak.%d", path, i)
-		if _, err := os.Stat(candidate); err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return candidate, nil
-			}
-			return "", fmt.Errorf("stat backup candidate: %w", err)
-		}
-	}
-	return "", fmt.Errorf("unable to determine backup name for %s", path)
 }

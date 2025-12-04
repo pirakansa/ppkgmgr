@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/pirakansa/ppkgmgr/internal/cli/manifest"
 	"github.com/pirakansa/ppkgmgr/internal/data"
 	"github.com/zeebo/blake3"
 )
@@ -47,7 +48,7 @@ func TestDownloadManifestFiles_SuccessWithEncodingAndDigests(t *testing.T) {
 	}
 
 	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
-	if err := downloadManifestFiles(fd, downloader, stdout, stderr, false, true, false); err != nil {
+	if err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false); err != nil {
 		t.Fatalf("downloadManifestFiles returned error: %v (stderr: %s)", err, stderr.String())
 	}
 
@@ -90,12 +91,12 @@ func TestDownloadManifestFiles_ArtifactDigestMismatch(t *testing.T) {
 	}
 
 	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
-	err := downloadManifestFiles(fd, downloader, stdout, stderr, false, true, false)
+	err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false)
 	if err == nil {
 		t.Fatalf("expected error but got nil")
 	}
 	var cliErr cliError
-	if !errors.As(err, &cliErr) || cliErr.code != 4 {
+	if !errors.As(err, &cliErr) || cliErr.Code != 4 {
 		t.Fatalf("expected cli error code 4, got %v", err)
 	}
 	if !strings.Contains(stderr.String(), "artifact digest mismatch") {
@@ -132,12 +133,12 @@ func TestDownloadManifestFiles_DigestMismatch(t *testing.T) {
 	}
 
 	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
-	err := downloadManifestFiles(fd, downloader, stdout, stderr, false, true, false)
+	err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false)
 	if err == nil {
 		t.Fatalf("expected error but got nil")
 	}
 	var cliErr cliError
-	if !errors.As(err, &cliErr) || cliErr.code != 4 {
+	if !errors.As(err, &cliErr) || cliErr.Code != 4 {
 		t.Fatalf("expected cli error code 4, got %v", err)
 	}
 	if !strings.Contains(stderr.String(), "digest mismatch") {
@@ -176,12 +177,12 @@ func TestDownloadManifestFiles_UnsupportedEncoding(t *testing.T) {
 	}
 
 	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
-	err := downloadManifestFiles(fd, downloader, stdout, stderr, false, true, false)
+	err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false)
 	if err == nil {
 		t.Fatalf("expected error but got nil")
 	}
 	var cliErr cliError
-	if !errors.As(err, &cliErr) || cliErr.code != 4 {
+	if !errors.As(err, &cliErr) || cliErr.Code != 4 {
 		t.Fatalf("expected cli error code 4, got %v", err)
 	}
 	if !strings.Contains(stderr.String(), "unsupported encoding") {

@@ -20,9 +20,9 @@ $ ppkgmgr repo rm <id_or_source>  # Remove a stored manifest by ID or source URL
 $ ppkgmgr pkg up  # Refresh stored manifests under ~/.ppkgmgr and redownload their files
 $ ppkgmgr pkg up --redownload  # Refresh and download even when manifest digests match (backups still apply when possible)
 $ ppkgmgr ver  # Display version information
-$ ppkgmgr dig <path_to_file>  # Show the BLAKE3 digest for a file
-$ ppkgmgr dig --format yaml <path_to_file>  # Emit a manifest-ready YAML snippet for a file's digest
-$ ppkgmgr dig --mode artifact --format yaml <path_to_artifact>  # Emit digest + artifact_digest for a compressed artifact
+$ ppkgmgr util dig <path_to_file>  # Show the BLAKE3 digest for a file
+$ ppkgmgr util dig --format yaml <path_to_file>  # Emit a manifest-ready YAML snippet for a file's digest
+$ ppkgmgr util dig --mode artifact --format yaml <path_to_artifact>  # Emit digest + artifact_digest for a compressed artifact
 $ ppkgmgr util zstd <src> <dst>  # Compress a file with zstd and print the resulting digest
 ```
 
@@ -40,7 +40,7 @@ Use `ppkgmgr util zstd` to produce zstd-compressed artifacts and capture their d
 
 1. Prepare the file you want to publish (for example, a binary build output).
 2. Run `ppkgmgr util zstd /path/to/input /path/to/output.zst`. The command creates parent directories as needed, writes the compressed file, and prints its BLAKE3 digest to stdout.
-3. Run `ppkgmgr dig --mode artifact --format yaml /path/to/output.zst` to generate a manifest snippet that includes both the `artifact_digest` (for the compressed blob) and the decoded file `digest`:
+3. Run `ppkgmgr util dig --mode artifact --format yaml /path/to/output.zst` to generate a manifest snippet that includes both the `artifact_digest` (for the compressed blob) and the decoded file `digest`:
 
    ```yaml
    files:
@@ -52,7 +52,7 @@ Use `ppkgmgr util zstd` to produce zstd-compressed artifacts and capture their d
    ```
 
 4. Adjust `file_name`, `out_dir`, or add `rename` as needed before adding the snippet to your manifest.
-5. For uncompressed files, run `ppkgmgr dig --format yaml /path/to/file` to emit a digest-only snippet suitable for a `files` entry.
+5. For uncompressed files, run `ppkgmgr util dig --format yaml /path/to/file` to emit a digest-only snippet suitable for a `files` entry.
 
 ## YAML Files
 

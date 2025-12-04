@@ -44,6 +44,11 @@ We follow the **Standard Go Project Layout**.
 * When adding a new CLI, create `cmd/<name>/main.go` and add a one-line description to both `README.md` and `AGENTS.md`.
 * Put `_test.go` files in the same package directory as the code under test, and use fixtures under `test/` when needed.
 * Keep public-facing logic in `pkg/` and internal-only logic in `internal/`, maintaining a one-way dependency direction.
+* For CLI work, keep to the following subpackage layout:
+  * `internal/cli/commands/<name>` – Cobra command definitions only; call into shared helpers instead of embedding logic here.
+  * `internal/cli/manifest` – Utilities dedicated to manifest handling (download orchestration, target resolution, integrity checks, etc.).
+  * `internal/cli/shared` – Types and helpers used across the CLI (`DownloadFunc`, error wrappers, path helpers, digest helpers, …).
+  * Enforce the one-way dependency `commands -> manifest/shared`; no other package should import from `internal/cli/commands`.
 
 ### Agent-Specific Rules
 
