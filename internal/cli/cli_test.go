@@ -17,6 +17,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/pirakansa/ppkgmgr/internal/registry"
+	yaml "gopkg.in/yaml.v3"
 
 	"github.com/zeebo/blake3"
 )
@@ -139,6 +140,221 @@ func TestRun_Dig(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+}
+
+func TestRun_DigYAMLSnippet(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "tool.bin")
+	content := []byte("digest yaml please")
+	if err := os.WriteFile(target, content, 0o644); err != nil {
+		t.Fatalf("failed to write sample file: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dig", "--format", "yaml", target}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	var snippet struct {
+		Files []struct {
+			FileName string `yaml:"file_name"`
+			OutDir   string `yaml:"out_dir"`
+			Digest   string `yaml:"digest"`
+		} `yaml:"files"`
+	}
+	if err := yaml.Unmarshal(stdout.Bytes(), &snippet); err != nil {
+		t.Fatalf("failed to decode yaml: %v", err)
+	}
+	if len(snippet.Files) != 1 {
+		t.Fatalf("expected one file entry, got %d", len(snippet.Files))
+	}
+
+	hash := blake3.Sum256(content)
+	expectedDigest := hex.EncodeToString(hash[:])
+	entry := snippet.Files[0]
+	if entry.FileName != filepath.Base(target) {
+		t.Fatalf("unexpected file_name: %q", entry.FileName)
+	}
+	if entry.OutDir != filepath.Dir(target) {
+		t.Fatalf("unexpected out_dir: %q", entry.OutDir)
+	}
+	if entry.Digest != expectedDigest {
+		t.Fatalf("unexpected digest: got %q, want %q", entry.Digest, expectedDigest)
+	}
+}
+
+func TestRun_DigArtifactYAMLSnippet(t *testing.T) {
+	dir := t.TempDir()
+	artifact := filepath.Join(dir, "tool.zst")
+	original := []byte("artifact digest yaml")
+
+	artifactFile, err := os.Create(artifact)
+	if err != nil {
+		t.Fatalf("failed to create artifact: %v", err)
+	}
+	encoder, err := zstd.NewWriter(artifactFile)
+	if err != nil {
+		artifactFile.Close()
+		t.Fatalf("failed to create encoder: %v", err)
+	}
+	if _, err := encoder.Write(original); err != nil {
+		encoder.Close()
+		artifactFile.Close()
+		t.Fatalf("failed to compress data: %v", err)
+	}
+	if err := encoder.Close(); err != nil {
+		artifactFile.Close()
+		t.Fatalf("failed to finalize encoder: %v", err)
+	}
+	if err := artifactFile.Close(); err != nil {
+		t.Fatalf("failed to close artifact: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dig", "--mode", "artifact", "--format", "yaml", artifact}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	var snippet struct {
+		Files []struct {
+			FileName       string `yaml:"file_name"`
+			OutDir         string `yaml:"out_dir"`
+			Digest         string `yaml:"digest"`
+			ArtifactDigest string `yaml:"artifact_digest"`
+			Encoding       string `yaml:"encoding"`
+		} `yaml:"files"`
+	}
+	if err := yaml.Unmarshal(stdout.Bytes(), &snippet); err != nil {
+		t.Fatalf("failed to decode yaml: %v", err)
+	}
+	if len(snippet.Files) != 1 {
+		t.Fatalf("expected one file entry, got %d", len(snippet.Files))
+	}
+
+	yamlOutput := stdout.String()
+	_, computedArtifactDigest, err := verifyDigest(artifact, "")
+	if err != nil {
+		t.Fatalf("failed to recompute artifact digest: %v", err)
+	}
+	contentHash := blake3.Sum256(original)
+	expectedContentDigest := hex.EncodeToString(contentHash[:])
+
+	entry := snippet.Files[0]
+	if entry.FileName != filepath.Base(artifact) {
+		t.Fatalf("unexpected file_name: %q", entry.FileName)
+	}
+	if entry.OutDir != filepath.Dir(artifact) {
+		t.Fatalf("unexpected out_dir: %q", entry.OutDir)
+	}
+	if entry.ArtifactDigest != computedArtifactDigest {
+		t.Fatalf("unexpected artifact digest: got %q, want %q", entry.ArtifactDigest, computedArtifactDigest)
+	}
+	if entry.Digest != expectedContentDigest {
+		t.Fatalf("unexpected digest: got %q, want %q", entry.Digest, expectedContentDigest)
+	}
+	if entry.Encoding != "zstd" {
+		t.Fatalf("unexpected encoding: %q", entry.Encoding)
+	}
+	if !strings.Contains(yamlOutput, computedArtifactDigest) {
+		t.Fatalf("expected digest to be present in yaml output")
+	}
+}
+
+func TestRun_DigArtifactRaw(t *testing.T) {
+	dir := t.TempDir()
+	artifact := filepath.Join(dir, "tool.zst")
+	content := []byte("raw artifact digest")
+
+	artifactFile, err := os.Create(artifact)
+	if err != nil {
+		t.Fatalf("failed to create artifact: %v", err)
+	}
+	encoder, err := zstd.NewWriter(artifactFile)
+	if err != nil {
+		artifactFile.Close()
+		t.Fatalf("failed to create encoder: %v", err)
+	}
+	if _, err := encoder.Write(content); err != nil {
+		encoder.Close()
+		artifactFile.Close()
+		t.Fatalf("failed to compress data: %v", err)
+	}
+	if err := encoder.Close(); err != nil {
+		artifactFile.Close()
+		t.Fatalf("failed to finalize encoder: %v", err)
+	}
+	if err := artifactFile.Close(); err != nil {
+		t.Fatalf("failed to close artifact: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dig", "--mode", "artifact", artifact}, &stdout, &stderr, nil)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	artifactDigest := strings.TrimSpace(stdout.String())
+	if artifactDigest == "" {
+		t.Fatalf("expected artifact digest output")
+	}
+	_, expectedDigest, err := verifyDigest(artifact, "")
+	if err != nil {
+		t.Fatalf("failed to compute expected digest: %v", err)
+	}
+	if artifactDigest != expectedDigest {
+		t.Fatalf("unexpected artifact digest: got %q, want %q", artifactDigest, expectedDigest)
+	}
+}
+
+func TestRun_DigInvalidMode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "file.bin")
+	if err := os.WriteFile(path, []byte("data"), 0o644); err != nil {
+		t.Fatalf("failed to write sample file: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dig", "--mode", "unknown", path}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "invalid mode") {
+		t.Fatalf("expected invalid mode message, got %q", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+}
+
+func TestRun_DigInvalidFormat(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "file.bin")
+	if err := os.WriteFile(path, []byte("data"), 0o644); err != nil {
+		t.Fatalf("failed to write sample file: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"dig", "--format", "unknown", path}, &stdout, &stderr, nil)
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "invalid format") {
+		t.Fatalf("expected invalid format message, got %q", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
 	}
 }
 
