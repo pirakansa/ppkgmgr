@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 )
 
 func TestExpandPathEnv(t *testing.T) {
@@ -11,7 +13,7 @@ func TestExpandPathEnv(t *testing.T) {
 	custom := filepath.Join(dir, "out")
 	t.Setenv("PPKGMGR_OUT", custom)
 
-	got, err := expandPath("$PPKGMGR_OUT")
+	got, err := shared.ExpandPath("$PPKGMGR_OUT")
 	if err != nil {
 		t.Fatalf("expandPath returned error: %v", err)
 	}
@@ -21,7 +23,7 @@ func TestExpandPathEnv(t *testing.T) {
 }
 
 func TestExpandPathEmpty(t *testing.T) {
-	got, err := expandPath("")
+	got, err := shared.ExpandPath("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -36,7 +38,7 @@ func TestStorageDirOverride(t *testing.T) {
 	t.Setenv("PPKGMGR_HOME", custom)
 	t.Setenv("HOME", filepath.Join(root, "home"))
 
-	got, err := storageDir()
+	got, err := shared.StorageDir()
 	if err != nil {
 		t.Fatalf("storageDir returned error: %v", err)
 	}
@@ -54,7 +56,7 @@ func TestStorageDirDefaultsToHome(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("PPKGMGR_HOME", "")
 
-	got, err := storageDir()
+	got, err := shared.StorageDir()
 	if err != nil {
 		t.Fatalf("storageDir returned error: %v", err)
 	}

@@ -23,7 +23,7 @@ func newVersionCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				fmt.Fprintln(cmd.ErrOrStderr(), "unexpected arguments")
-				return cliError{code: 1}
+				return cliError{Code: 1}
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Version : %s\n", resolvedVersion())
 			return nil

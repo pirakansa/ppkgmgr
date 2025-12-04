@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 	"github.com/pirakansa/ppkgmgr/internal/registry"
 	yaml "gopkg.in/yaml.v3"
 
@@ -45,10 +46,10 @@ func expectTempDownloadPath(t *testing.T, path string) {
 }
 
 func TestDefaultData(t *testing.T) {
-	if got := defaultData("", "fallback"); got != "fallback" {
+	if got := shared.DefaultData("", "fallback"); got != "fallback" {
 		t.Fatalf("expected fallback, got %q", got)
 	}
-	if got := defaultData("value", "fallback"); got != "value" {
+	if got := shared.DefaultData("value", "fallback"); got != "value" {
 		t.Fatalf("expected value, got %q", got)
 	}
 }
@@ -241,7 +242,7 @@ func TestRun_DigArtifactYAMLSnippet(t *testing.T) {
 	}
 
 	yamlOutput := stdout.String()
-	_, computedArtifactDigest, err := verifyDigest(artifact, "")
+	_, computedArtifactDigest, err := shared.VerifyDigest(artifact, "")
 	if err != nil {
 		t.Fatalf("failed to recompute artifact digest: %v", err)
 	}
@@ -309,7 +310,7 @@ func TestRun_DigArtifactRaw(t *testing.T) {
 	if artifactDigest == "" {
 		t.Fatalf("expected artifact digest output")
 	}
-	_, expectedDigest, err := verifyDigest(artifact, "")
+	_, expectedDigest, err := shared.VerifyDigest(artifact, "")
 	if err != nil {
 		t.Fatalf("failed to compute expected digest: %v", err)
 	}
@@ -395,7 +396,7 @@ func TestRun_UtilZstd(t *testing.T) {
 		t.Fatalf("expected digest output, got empty string")
 	}
 
-	_, expectedDigest, err := verifyDigest(dst, "")
+	_, expectedDigest, err := shared.VerifyDigest(dst, "")
 	if err != nil {
 		t.Fatalf("failed to compute expected digest: %v", err)
 	}
@@ -1279,7 +1280,7 @@ func TestRunPkgUp_RefreshAndDownload(t *testing.T) {
 		t.Fatalf("expected single registry entry, got %d", len(updatedStore.Entries))
 	}
 	expectedDigest := updatedStore.Entries[0].Digest
-	match, actual, err := verifyDigest(manifestPath, expectedDigest)
+	match, actual, err := shared.VerifyDigest(manifestPath, expectedDigest)
 	if err != nil {
 		t.Fatalf("failed to verify digest: %v", err)
 	}
@@ -1387,7 +1388,7 @@ func TestRunPkgUp_RefreshWhenFilesDrift(t *testing.T) {
 	if err := os.WriteFile(manifestPath, []byte(manifestContent), 0o600); err != nil {
 		t.Fatalf("failed to seed cached manifest: %v", err)
 	}
-	_, manifestDigest, err := verifyDigest(manifestPath, "")
+	_, manifestDigest, err := shared.VerifyDigest(manifestPath, "")
 	if err != nil {
 		t.Fatalf("failed to hash manifest: %v", err)
 	}
@@ -1460,7 +1461,7 @@ func TestRunPkgUp_SkipWhenDigestMatches(t *testing.T) {
 	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write cached manifest: %v", err)
 	}
-	_, digest, err := verifyDigest(manifestPath, "")
+	_, digest, err := shared.VerifyDigest(manifestPath, "")
 	if err != nil {
 		t.Fatalf("failed to hash manifest: %v", err)
 	}
@@ -1526,7 +1527,7 @@ func TestRunPkgUp_RedownloadFlagDownloadsWhenDigestMatches(t *testing.T) {
 	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write cached manifest: %v", err)
 	}
-	_, digest, err := verifyDigest(manifestPath, "")
+	_, digest, err := shared.VerifyDigest(manifestPath, "")
 	if err != nil {
 		t.Fatalf("failed to hash manifest: %v", err)
 	}
@@ -1595,7 +1596,7 @@ func TestRunPkgUp_RedownloadWhenNeverUpdated(t *testing.T) {
 	if err := os.WriteFile(manifestPath, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write cached manifest: %v", err)
 	}
-	_, digest, err := verifyDigest(manifestPath, "")
+	_, digest, err := shared.VerifyDigest(manifestPath, "")
 	if err != nil {
 		t.Fatalf("failed to hash manifest: %v", err)
 	}

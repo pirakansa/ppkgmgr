@@ -4,6 +4,11 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	downloadcmd "github.com/pirakansa/ppkgmgr/internal/cli/commands/download"
+	pkgcmd "github.com/pirakansa/ppkgmgr/internal/cli/commands/pkg"
+	repocmd "github.com/pirakansa/ppkgmgr/internal/cli/commands/repo"
+	utilcmd "github.com/pirakansa/ppkgmgr/internal/cli/commands/util"
 )
 
 // newRootCmd creates the root ppkgmgr command and attaches all subcommands.
@@ -15,14 +20,14 @@ func newRootCmd(downloader DownloadFunc) *cobra.Command {
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(cmd.ErrOrStderr(), "require subcommand (run 'ppkgmgr help' for usage)")
-			return cliError{code: 1}
+			return cliError{Code: 1}
 		},
 	}
 
-	cmd.AddCommand(newDownloadCmd(downloader))
-	cmd.AddCommand(newRepoCmd())
-	cmd.AddCommand(newPkgCmd(downloader))
+	cmd.AddCommand(downloadcmd.New(downloader))
+	cmd.AddCommand(repocmd.New())
+	cmd.AddCommand(pkgcmd.New(downloader))
 	cmd.AddCommand(newVersionCmd())
-	cmd.AddCommand(newUtilCmd())
+	cmd.AddCommand(utilcmd.New())
 	return cmd
 }

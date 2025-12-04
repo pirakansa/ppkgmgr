@@ -1,16 +1,18 @@
-package cli
+package download
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/pirakansa/ppkgmgr/internal/data"
-
 	"github.com/spf13/cobra"
+
+	"github.com/pirakansa/ppkgmgr/internal/cli/manifest"
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
+	"github.com/pirakansa/ppkgmgr/internal/data"
 )
 
-// newDownloadCmd wires the `dl` command that downloads manifest entries.
-func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
+// New wires the `dl` command that downloads manifest entries.
+func New(downloader shared.DownloadFunc) *cobra.Command {
 	var spider bool
 	var overwrite bool
 
@@ -23,28 +25,28 @@ func newDownloadCmd(downloader DownloadFunc) *cobra.Command {
 
 			if len(args) == 0 {
 				fmt.Fprintln(stderr, "require manifest path argument")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 			if len(args) > 1 {
 				fmt.Fprintln(stderr, "unexpected arguments")
-				return cliError{code: 1}
+				return shared.Error{Code: 1}
 			}
 
 			path := args[0]
-			if !isRemotePath(path) {
+			if !shared.IsRemotePath(path) {
 				if _, err := os.Stat(path); err != nil {
 					fmt.Fprintln(stderr, "not found path")
-					return cliError{code: 2}
+					return shared.Error{Code: 2}
 				}
 			}
 
 			fd, err := data.Parse(path)
 			if err != nil {
 				fmt.Fprintf(stderr, "failed to parse data: %v\n", err)
-				return cliError{code: 3}
+				return shared.Error{Code: 3}
 			}
 
-			return downloadManifestFiles(fd, downloader, stdout, stderr, spider, overwrite, false)
+			return manifest.DownloadFiles(fd, downloader, stdout, stderr, spider, overwrite, false)
 		},
 	}
 

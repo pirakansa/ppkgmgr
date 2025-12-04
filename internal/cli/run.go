@@ -1,21 +1,16 @@
 package cli
 
 import (
-	"errors"
 	"io"
+
+	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 )
 
 // DownloadFunc downloads the remote file at the first argument into the
 // location provided by the second argument.
-type DownloadFunc func(string, string) (int64, error)
+type DownloadFunc = shared.DownloadFunc
 
-type cliError struct {
-	code int
-}
-
-func (e cliError) Error() string {
-	return "cli error"
-}
+type cliError = shared.Error
 
 // Run executes the ppkgmgr CLI with the provided arguments and writers,
 // returning the process exit code.
@@ -26,15 +21,7 @@ func Run(args []string, stdout, stderr io.Writer, downloader DownloadFunc) int {
 	root.SetArgs(args)
 
 	if err := root.Execute(); err != nil {
-		return exitCode(err)
+		return shared.ExitCode(err)
 	}
 	return 0
-}
-
-func exitCode(err error) int {
-	var cliErr cliError
-	if errors.As(err, &cliErr) {
-		return cliErr.code
-	}
-	return 1
 }
