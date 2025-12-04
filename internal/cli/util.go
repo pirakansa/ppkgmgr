@@ -50,6 +50,22 @@ func newZstdCmd() *cobra.Command {
 				return cliError{code: 1}
 			}
 
+			srcAbs, err := filepath.Abs(srcPath)
+			if err != nil {
+				fmt.Fprintf(stderr, "failed to resolve source path: %v\n", err)
+				return cliError{code: 5}
+			}
+			dstAbs, err := filepath.Abs(dstPath)
+			if err != nil {
+				fmt.Fprintf(stderr, "failed to resolve destination path: %v\n", err)
+				return cliError{code: 5}
+			}
+
+			if srcAbs == dstAbs {
+				fmt.Fprintln(stderr, "source and destination paths must be different")
+				return cliError{code: 1}
+			}
+
 			srcFile, err := os.Open(srcPath)
 			if err != nil {
 				fmt.Fprintf(stderr, "failed to open source: %v\n", err)
