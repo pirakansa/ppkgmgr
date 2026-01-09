@@ -6,6 +6,92 @@
 - Parse YAML files to retrieve repository information.
 - Download files via HTTP.
 
+## Installation
+
+### Quick Install (Linux / macOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
+```
+
+You can specify a version and installation directory:
+
+```sh
+PPKGMGR_VERSION=v0.8.0 PPKGMGR_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
+```
+
+### Using `go install`
+
+If you have Go installed:
+
+```sh
+go install github.com/pirakansa/ppkgmgr/cmd/ppkgmgr@latest
+```
+
+### Manual Download
+
+Download prebuilt binaries from the [Releases](https://github.com/pirakansa/ppkgmgr/releases) page.
+
+Available platforms:
+- Linux (amd64, arm, arm64)
+- macOS (amd64, arm64)
+- Windows (amd64)
+
+### GitHub Actions
+
+Use ppkgmgr directly in your workflows:
+
+```yaml
+# Download files from a manifest
+- uses: pirakansa/ppkgmgr@v0
+  with:
+    manifest: ./path/to/manifest.yml
+```
+
+With options:
+
+```yaml
+- uses: pirakansa/ppkgmgr@v0
+  with:
+    manifest: https://example.com/manifest.yml
+    version: v0.8.0      # Pin to a specific version (default: latest)
+    overwrite: true      # Overwrite existing files without backups
+```
+
+#### Creating releases with ppkgmgr-compatible manifests
+
+Compress build artifacts and generate manifest snippets in your release workflow:
+
+```yaml
+# Compress a binary with zstd
+- uses: pirakansa/ppkgmgr@v0
+  id: compress
+  with:
+    command: zstd
+    src: ./bin/myapp
+    dst: ./release/myapp.zst
+
+# Generate a YAML snippet for the compressed artifact
+- uses: pirakansa/ppkgmgr@v0
+  id: manifest
+  with:
+    command: dig
+    file: ./release/myapp.zst
+    mode: artifact
+    format: yaml
+
+# Use the outputs
+- run: |
+    echo "Digest: ${{ steps.compress.outputs.digest }}"
+    echo "YAML snippet:"
+    echo "${{ steps.manifest.outputs.yaml }}"
+```
+
+Available outputs:
+- `digest` - BLAKE3 digest of the file
+- `artifact-digest` - BLAKE3 digest of the artifact before decoding (for `dig --mode artifact`)
+- `yaml` - Generated YAML snippet (for `dig --format yaml`)
+
 ## Usage
 
 ### Command Examples
