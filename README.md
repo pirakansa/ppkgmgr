@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh |
 You can specify a version and installation directory:
 
 ```sh
-PPKGMGR_VERSION=v0.7.0 PPKGMGR_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
+PPKGMGR_VERSION=v0.8.0 PPKGMGR_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
 ```
 
 ### Using `go install`
