@@ -1,5 +1,5 @@
 # This workflow will build and release the tool when a tag is pushed
-# Create a release by pushing a tag: git tag v0.7.0 && git push origin v0.7.0
+# Create a release by pushing a tag: git tag v0.8.0 && git push origin v0.8.0
 
 name: Release
 
@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -47,3 +49,13 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update major version tag
+      if: contains(github.ref, '.')
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        MAJOR=$(echo $VERSION | cut -d. -f1)
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -fa $MAJOR -m "Update $MAJOR to $VERSION"
+        git push -f origin $MAJOR

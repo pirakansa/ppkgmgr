@@ -43,7 +43,7 @@ Use ppkgmgr directly in your workflows:
 
 ```yaml
 # Download files from a manifest
-- uses: pirakansa/ppkgmgr@v1
+- uses: pirakansa/ppkgmgr@v0
   with:
     manifest: ./path/to/manifest.yml
 ```
@@ -51,10 +51,10 @@ Use ppkgmgr directly in your workflows:
 With options:
 
 ```yaml
-- uses: pirakansa/ppkgmgr@v1
+- uses: pirakansa/ppkgmgr@v0
   with:
     manifest: https://example.com/manifest.yml
-    version: v0.7.0      # Pin to a specific version (default: latest)
+    version: v0.8.0      # Pin to a specific version (default: latest)
     overwrite: true      # Overwrite existing files without backups
 ```
 
@@ -64,7 +64,7 @@ Compress build artifacts and generate manifest snippets in your release workflow
 
 ```yaml
 # Compress a binary with zstd
-- uses: pirakansa/ppkgmgr@v1
+- uses: pirakansa/ppkgmgr@v0
   id: compress
   with:
     command: zstd
@@ -72,7 +72,7 @@ Compress build artifacts and generate manifest snippets in your release workflow
     dst: ./release/myapp.zst
 
 # Generate a YAML snippet for the compressed artifact
-- uses: pirakansa/ppkgmgr@v1
+- uses: pirakansa/ppkgmgr@v0
   id: manifest
   with:
     command: dig
