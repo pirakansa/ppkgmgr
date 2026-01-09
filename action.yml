@@ -60,6 +60,15 @@ runs:
       run: |
         OS=$(uname -s | tr '[:upper:]' '[:lower:]')
         ARCH=$(uname -m)
+        case "$OS" in
+          linux) ;;
+          darwin) ;;
+          mingw*|msys*|cygwin*) OS="windows" ;;
+          *)
+            echo "Unsupported OS: ${OS}"
+            exit 1
+            ;;
+        esac
         case "$ARCH" in
           x86_64|amd64)  ARCH="amd64" ;;
           aarch64|arm64) ARCH="arm64" ;;
