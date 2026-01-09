@@ -1,0 +1,164 @@
+name: 'ppkgmgr'
+description: 'Download files from manifests, compress with zstd, or generate manifest snippets'
+author: 'pirakansa'
+
+branding:
+  icon: 'download'
+  color: 'blue'
+
+inputs:
+  command:
+    description: 'Command to run: dl, zstd, or dig'
+    required: false
+    default: 'dl'
+  manifest:
+    description: 'Path or URL to the manifest YAML file (for dl command)'
+    required: false
+  version:
+    description: 'Version of ppkgmgr to use (default: latest)'
+    required: false
+    default: 'latest'
+  overwrite:
+    description: 'Overwrite existing files without backups (for dl command)'
+    required: false
+    default: 'false'
+  src:
+    description: 'Source file path (for zstd command)'
+    required: false
+  dst:
+    description: 'Destination file path (for zstd command)'
+    required: false
+  file:
+    description: 'File path to compute digest (for dig command)'
+    required: false
+  mode:
+    description: 'Digest mode: file or artifact (for dig command, default: file)'
+    required: false
+    default: 'file'
+  format:
+    description: 'Output format: raw or yaml (for dig command, default: raw)'
+    required: false
+    default: 'raw'
+
+outputs:
+  digest:
+    description: 'BLAKE3 digest of the output file (from zstd or dig command)'
+    value: ${{ steps.run.outputs.digest }}
+  artifact-digest:
+    description: 'BLAKE3 digest of the artifact before decoding (from dig --mode artifact)'
+    value: ${{ steps.run.outputs.artifact_digest }}
+  yaml:
+    description: 'Generated YAML snippet (from dig --format yaml)'
+    value: ${{ steps.run.outputs.yaml }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64|amd64)  ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+          armv7*|armv6*) ARCH="arm" ;;
+        esac
+        echo "os=${OS}" >> $GITHUB_OUTPUT
+        echo "arch=${ARCH}" >> $GITHUB_OUTPUT
+
+    - name: Get version
+      id: version
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -fsSL https://api.github.com/repos/pirakansa/ppkgmgr/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Download ppkgmgr
+      shell: bash
+      run: |
+        URL="https://github.com/pirakansa/ppkgmgr/releases/download/${{ steps.version.outputs.version }}/ppkgmgr_${{ steps.platform.outputs.os }}-${{ steps.platform.outputs.arch }}.tar.gz"
+        echo "Downloading ppkgmgr from ${URL}"
+        curl -fsSL "${URL}" | tar -xz -C "${{ runner.temp }}"
+        chmod +x "${{ runner.temp }}/ppkgmgr"
+
+    - name: Run ppkgmgr
+      id: run
+      shell: bash
+      run: |
+        PPKGMGR="${{ runner.temp }}/ppkgmgr"
+        COMMAND="${{ inputs.command }}"
+
+        case "$COMMAND" in
+          dl)
+            if [ -z "${{ inputs.manifest }}" ]; then
+              echo "Error: manifest input is required for dl command"
+              exit 1
+            fi
+            ARGS=""
+            if [ "${{ inputs.overwrite }}" = "true" ]; then
+              ARGS="--overwrite"
+            fi
+            "$PPKGMGR" dl ${ARGS} "${{ inputs.manifest }}"
+            ;;
+
+          zstd)
+            if [ -z "${{ inputs.src }}" ] || [ -z "${{ inputs.dst }}" ]; then
+              echo "Error: src and dst inputs are required for zstd command"
+              exit 1
+            fi
+            DIGEST=$("$PPKGMGR" util zstd "${{ inputs.src }}" "${{ inputs.dst }}")
+            echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+            echo "Compressed ${{ inputs.src }} -> ${{ inputs.dst }}"
+            echo "Digest: ${DIGEST}"
+            ;;
+
+          dig)
+            if [ -z "${{ inputs.file }}" ]; then
+              echo "Error: file input is required for dig command"
+              exit 1
+            fi
+            ARGS=""
+            if [ "${{ inputs.mode }}" = "artifact" ]; then
+              ARGS="--mode artifact"
+            fi
+            if [ "${{ inputs.format }}" = "yaml" ]; then
+              ARGS="${ARGS} --format yaml"
+              OUTPUT=$("$PPKGMGR" util dig ${ARGS} "${{ inputs.file }}")
+              echo "yaml<<EOF" >> $GITHUB_OUTPUT
+              echo "${OUTPUT}" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              # Extract digest and artifact_digest from YAML output
+              DIGEST=$(echo "${OUTPUT}" | grep "digest:" | head -1 | sed 's/.*digest: //')
+              echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+              if [ "${{ inputs.mode }}" = "artifact" ]; then
+                ARTIFACT_DIGEST=$(echo "${OUTPUT}" | grep "artifact_digest:" | sed 's/.*artifact_digest: //')
+                echo "artifact_digest=${ARTIFACT_DIGEST}" >> $GITHUB_OUTPUT
+              fi
+              echo "${OUTPUT}"
+            else
+              OUTPUT=$("$PPKGMGR" util dig ${ARGS} "${{ inputs.file }}")
+              if [ "${{ inputs.mode }}" = "artifact" ]; then
+                # artifact mode outputs two lines: digest and artifact_digest
+                DIGEST=$(echo "${OUTPUT}" | head -1)
+                ARTIFACT_DIGEST=$(echo "${OUTPUT}" | tail -1)
+                echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+                echo "artifact_digest=${ARTIFACT_DIGEST}" >> $GITHUB_OUTPUT
+                echo "Digest: ${DIGEST}"
+                echo "Artifact Digest: ${ARTIFACT_DIGEST}"
+              else
+                echo "digest=${OUTPUT}" >> $GITHUB_OUTPUT
+                echo "Digest: ${OUTPUT}"
+              fi
+            fi
+            ;;
+
+          *)
+            echo "Error: Unknown command '${COMMAND}'. Use dl, zstd, or dig."
+            exit 1
+            ;;
+        esac

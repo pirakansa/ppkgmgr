@@ -37,6 +37,61 @@ Available platforms:
 - macOS (amd64, arm64)
 - Windows (amd64)
 
+### GitHub Actions
+
+Use ppkgmgr directly in your workflows:
+
+```yaml
+# Download files from a manifest
+- uses: pirakansa/ppkgmgr@v1
+  with:
+    manifest: ./path/to/manifest.yml
+```
+
+With options:
+
+```yaml
+- uses: pirakansa/ppkgmgr@v1
+  with:
+    manifest: https://example.com/manifest.yml
+    version: v0.7.0      # Pin to a specific version (default: latest)
+    overwrite: true      # Overwrite existing files without backups
+```
+
+#### Creating releases with ppkgmgr-compatible manifests
+
+Compress build artifacts and generate manifest snippets in your release workflow:
+
+```yaml
+# Compress a binary with zstd
+- uses: pirakansa/ppkgmgr@v1
+  id: compress
+  with:
+    command: zstd
+    src: ./bin/myapp
+    dst: ./release/myapp.zst
+
+# Generate a YAML snippet for the compressed artifact
+- uses: pirakansa/ppkgmgr@v1
+  id: manifest
+  with:
+    command: dig
+    file: ./release/myapp.zst
+    mode: artifact
+    format: yaml
+
+# Use the outputs
+- run: |
+    echo "Digest: ${{ steps.compress.outputs.digest }}"
+    echo "YAML snippet:"
+    echo "${{ steps.manifest.outputs.yaml }}"
+```
+
+Available outputs:
+- `digest` - BLAKE3 digest of the file
+- `artifact-digest` - BLAKE3 digest of the artifact before decoding (for `dig --mode artifact`)
+- `yaml` - Generated YAML snippet (for `dig --format yaml`)
+
 ## Usage
 
 ### Command Examples
