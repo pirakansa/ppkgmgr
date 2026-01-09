@@ -39,6 +39,8 @@ jobs:
           ppkgmgr_linux-amd64.tar.gz
           ppkgmgr_linux-arm.tar.gz
           ppkgmgr_linux-arm64.tar.gz
+          ppkgmgr_darwin-amd64.tar.gz
+          ppkgmgr_darwin-arm64.tar.gz
           ppkgmgr_win-amd64.tar.gz
         generate_release_notes: true
         draft: false

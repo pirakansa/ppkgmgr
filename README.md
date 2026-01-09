@@ -6,6 +6,37 @@
 - Parse YAML files to retrieve repository information.
 - Download files via HTTP.
 
+## Installation
+
+### Quick Install (Linux / macOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
+```
+
+You can specify a version and installation directory:
+
+```sh
+PPKGMGR_VERSION=v0.7.0 PPKGMGR_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
+```
+
+### Using `go install`
+
+If you have Go installed:
+
+```sh
+go install github.com/pirakansa/ppkgmgr/cmd/ppkgmgr@latest
+```
+
+### Manual Download
+
+Download prebuilt binaries from the [Releases](https://github.com/pirakansa/ppkgmgr/releases) page.
+
+Available platforms:
+- Linux (amd64, arm, arm64)
+- macOS (amd64, arm64)
+- Windows (amd64)
+
 ## Usage
 
 ### Command Examples
