@@ -166,21 +166,17 @@ type(scope?): description
 
 ---
 
-## 11. Documentation Policy
+## Documentation Policy
 
-* **README.md (top level)**:
-  * Introduction: tool overview, usage, installation.
-  * Later sections: developer build steps, testing instructions.
-  * Keep it accessible so first-time users can onboard smoothly.
-
-* **docs/**:
-  * Create detailed designs or supplemental docs as needed. None exist yet, so define structure and filenames when adding.
-
-* **Operational Guidelines**:
-  * Update documentation alongside code changes; if none are needed, note "No documentation changes" in the PR description.
-  * Verify sample code and command examples actually work.
-  * Include generation scripts when submitting auto-generated docs.
-
+- **README.md (top level)** is onboarding-first: overview, install, and one quick-start. Keep it short and link to details in `docs/`.
+- **docs/** holds detailed documentation and is organized as:
+  - **User guides** (practical usage / workflows)
+  - **Specification references** (contracts: schema, flags, processing rules)
+  - If content mixes both, split it into the appropriate documents.
+- **Source of truth**
+  - For post-implementation updates, treat **code + passing tests** as SoT and use `docs-maintenance-implementation-sync`.
+  - For design-first work where the **spec is SoT**, use the spec-driven skills (`spec-driven-doc-authoring` / `spec-to-code-implementation`).
+- **PR hygiene**: Update docs with behavior changes. If no doc updates are needed, explicitly note **"No documentation changes"** in the PR description.
 ---
 
 ## 12. Dependency Management Policy
