@@ -4,6 +4,26 @@ This document is the **README for AI coding agents**. It complements the human-f
 
 ---
 
+
+## Documentation of Process vs Policy
+
+This repository separates **policy** from **how-to guidance**:
+
+- **AGENTS.md = Policy (MUST/MUST NOT)**  
+  Contains the mandatory rules agents must follow (e.g., language requirements, required sections, validation expectations, boundaries).
+  Keep it short and stable.
+
+- **SKILLS = Procedure / Templates / Checklists**  
+  Contains step-by-step workflows, templates, and checklists used to comply with policy.
+  Prefer updating skills when improving writing structure or workflow details.
+
+Rule of thumb:
+- If it is a non-negotiable rule for reviews/CI: put it in **AGENTS.md**.
+- If it is an example, template, or writing process: put it in a **skill**.
+
+
+---
+
 ## 1. Setup Steps
 
 * Recommended: VS Code Dev Container / GitHub Codespaces (use the `.devcontainer/` image).
@@ -130,39 +150,27 @@ This project follows **GitHub Flow** based on `main`.
 
 ---
 
-## 10. Commit Message Policy
+## Commit Message Policy
 
-Commit messages follow **Conventional Commits**. Agents must comply. Write the comment section in **English**.
+Commit messages MUST follow **Conventional Commits** and MUST be written in **English**.
 
-### Format
+### Header
+`type(scope?): description`
 
-```
-type(scope?): description
-```
-
-* `type`: feat / fix / docs / style / refactor / test / chore
-* `scope`: Optional; module or directory names, etc.
-* `description`: Describe the change concisely in English.
+- `type`: feat / fix / docs / style / refactor / test / chore
+- `scope`: optional (module/package/directory)
+- `description`: concise present-tense English summary
 
 ### Body
-
-* Write the WHY (reason for the change) in a single English sentence.
-* List the HOW (per-file changes) in English.
-
-```
-- internal/data/data.go: Added error return when YAML parsing fails
-- pkg/req/req.go: Strengthened HTTP timeout configuration
-```
+- First body line MUST state the **WHY** (reason for the change) in a single English sentence.
+- Then list the **HOW** as per-file bullet points in English (`path: concrete change`).
+- Do not claim tests passed unless they were actually run.
 
 ### Granularity
+- One semantic change per commit.
+- Keep generated files separate when practical; do not mix with other changes.
 
-* Default to one semantic change per commit.
-* Separate generated code into logical units; do not mix with other changes.
-
-### PRs and Commits
-
-* Always document **Motivation / Design / Tests / Risks** in English in the PR description.
-* Follow team policy on squashing after reviews; if none, keep the original commit structure.
+For structured authoring (template, checklist), use the skill: `conventional-commits-authoring`.
 
 ---
 
@@ -213,30 +221,15 @@ type(scope?): description
 
 ---
 
-## 14. PR Template
+## PR Template
 
-Include the following items when creating a PR:
+PR descriptions MUST be written in **English** and MUST include:
+- Motivation
+- Design
+- Tests (only what was actually run)
+- Risks
 
-* **Motivation**: Why this change is needed.
-* **Design**: How you implemented it.
-* **Tests**: Which tests were run.
-* **Risks**: Potential side effects or concerns.
-
-Template example:
-
-```
-### Motivation
-...
-
-### Design
-...
-
-### Tests
-...
-
-### Risks
-...
-```
+For structured authoring (template, checklist), use the skill: `pr-description-authoring`.
 
 ---
 
