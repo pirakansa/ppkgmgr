@@ -41,5 +41,6 @@ Generate compressed artifacts and digest metadata that can be copied into manife
 
 ## Related docs
 
+- GitHub Action reference: [github-action.md](./github-action.md)
 - Manifest reference: [manifest.md](./manifest.md)
 - Artifact authoring: [artifact-authoring.md](./artifact-authoring.md)

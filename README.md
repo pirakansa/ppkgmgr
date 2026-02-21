@@ -54,6 +54,10 @@ With options:
     overwrite: true      # Overwrite existing files without backups
 ```
 
+For full Action inputs/outputs and command requirements, see:
+
+- [docs/github-action.md](./docs/github-action.md)
+
 #### Creating releases with ppkgmgr-compatible manifests
 
 For release/CI-focused workflows, see:

@@ -24,13 +24,15 @@ repositories:
         rename: <optional output name>
         mode: <optional octal file mode string, e.g. "0755">
         symlink:
-          link: <optional symlink path>
-          target: <optional symlink target>
+          link: <required when symlink is set>
+          target: <required when symlink is set>
 ```
 
 ## Processing flow
 
 When `encoding` is provided, downloads are written to a temporary file, validated with `artifact_digest` (if present), decoded/extracted to the destination, then validated again with `digest` (if present).
+
+If extraction produces multiple files (for example full-archive extraction), `digest` cannot be applied to a single output file path. In that case, prefer `artifact_digest` for integrity verification of the downloaded artifact.
 
 ## Supported encodings
 
