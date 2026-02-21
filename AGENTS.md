@@ -42,7 +42,7 @@ Rule of thumb:
 
 ---
 
-## 3. Project Structure
+## Project Structure
 
 We follow the **Standard Go Project Layout**.
 
@@ -78,7 +78,7 @@ We follow the **Standard Go Project Layout**.
 
 ---
 
-## 4. Coding Standards
+## Coding Standards
 
 * Always run `make staticcheck` so the code remains `staticcheck`-formatted.
 * Run `make lint` for static checks and ensure there are no warnings (CI requirement).
@@ -89,7 +89,7 @@ We follow the **Standard Go Project Layout**.
 
 ---
 
-## 5. Testing & Verification
+## Testing & Verification
 
 * Unit tests: `make test`
 * For additional file or network operations, use temp directories or `httptest` to avoid external dependencies.
@@ -103,7 +103,7 @@ We follow the **Standard Go Project Layout**.
 
 ---
 
-## 6. CI Requirements
+## CI Requirements
 
 GitHub Actions (`.github/workflows/go.yml`) runs the following:
 
@@ -115,7 +115,7 @@ Confirm `make lint` / `make test` / `make build` succeed locally before opening 
 
 ---
 
-## 7. Security & Data Handling
+## Security & Data Handling
 
 * Do not commit secrets or confidential information.
 * Do not log personal or authentication data in logs or error messages.
@@ -124,7 +124,7 @@ Confirm `make lint` / `make test` / `make build` succeed locally before opening 
 
 ---
 
-## 8. Agent Notes
+## Agent Notes
 
 * If multiple `AGENTS.md` files exist, reference the one closest to your working directory (this repository only has the top-level file).
 * When instructions conflict, prioritize explicit user prompts and clarify any uncertainties.
@@ -186,7 +186,7 @@ For structured authoring (template, checklist), use the skill: `conventional-com
 - **PR hygiene**: Update docs with behavior changes. If no doc updates are needed, explicitly note **"No documentation changes"** in the PR description.
 ---
 
-## 12. Dependency Management Policy
+## Dependency Management Policy
 
 * Add dependencies with `go get <module>@<version>` and keep `go.mod` / `go.sum` in sync.
 * Remove unused dependencies with `go mod tidy`.
@@ -195,13 +195,13 @@ For structured authoring (template, checklist), use the skill: `conventional-com
 
 ---
 
-## 13. Release Process
+## Release Process
 
 * Follow **SemVer** for versioning.
 * Tag new releases with `git tag vX.Y.Z` and verify `make release` outputs.
 * Update CHANGELOG.md and reflect the changes in the release notes (include generators in the PR if they were used).
 
-### 13.1 CHANGELOG.md Policy
+### CHANGELOG.md Policy
 
 * **Sections**: Follow `[Keep a Changelog]` categories - `Added / Changed / Fixed / Deprecated / Removed / Security`.
 * **Language**: English.
@@ -232,7 +232,7 @@ For structured authoring (template, checklist), use the skill: `pr-description-a
 
 ---
 
-## 15. Checklist
+## Checklist
 
 * [ ] `make lint`
 * [ ] `make test`
