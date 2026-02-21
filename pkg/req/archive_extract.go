@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// ExtractArchive extracts a supported archive into dstDir.
+// extractArchive extracts a supported archive into dstDir.
 // If extractPath is provided, only that file/directory is moved into dstDir,
 // optionally renamed when rename is non-empty. The returned string is the
 // resulting output path for extractPath mode; for full extraction it returns "".
-func ExtractArchive(encoding, srcPath, dstDir, extractPath, rename string) (string, error) {
+func extractArchive(encoding, srcPath, dstDir, extractPath, rename string) (string, error) {
 	if err := os.MkdirAll(dstDir, 0o755); err != nil {
 		return "", fmt.Errorf("create destination directory: %w", err)
 	}

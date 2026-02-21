@@ -13,7 +13,7 @@ import (
 	"github.com/pirakansa/ppkgmgr/pkg/req"
 )
 
-func processDownloadedArtifact(fileEntry data.File, artifactPath, outputPath string) error {
+func processDownloadedArtifact(fileEntry data.File, artifactPath, plannedPath string) error {
 	if strings.TrimSpace(fileEntry.ArtifactDigest) != "" {
 		match, actual, err := shared.VerifyDigest(artifactPath, fileEntry.ArtifactDigest)
 		if err != nil {
@@ -24,7 +24,7 @@ func processDownloadedArtifact(fileEntry data.File, artifactPath, outputPath str
 		}
 	}
 
-	finalPath, err := decodeArtifactToOutput(fileEntry, artifactPath, outputPath)
+	finalPath, err := decodeArtifactToOutput(fileEntry, artifactPath, plannedPath)
 	if err != nil {
 		return err
 	}
@@ -44,20 +44,25 @@ func processDownloadedArtifact(fileEntry data.File, artifactPath, outputPath str
 	return nil
 }
 
-func decodeArtifactToOutput(fileEntry data.File, artifactPath, outputPath string) (string, error) {
-	if isArchiveEncoding(fileEntry.Encoding) {
+func decodeArtifactToOutput(fileEntry data.File, artifactPath, plannedPath string) (string, error) {
+	decodeOptions := req.DecodeArtifactOptions{
+		Encoding:   fileEntry.Encoding,
+		SourcePath: artifactPath,
+		OutputPath: plannedPath,
+		Extract:    fileEntry.Extract,
+		Rename:     fileEntry.Rename,
+	}
+
+	if req.IsArchiveEncoding(fileEntry.Encoding) {
 		outDir, err := resolveOutDir(fileEntry)
 		if err != nil {
 			return "", err
 		}
-		extractedPath, err := req.ExtractArchive(fileEntry.Encoding, artifactPath, outDir, fileEntry.Extract, fileEntry.Rename)
-		if err != nil {
-			return "", fmt.Errorf("decode file: %w", err)
-		}
-		return extractedPath, nil
+		decodeOptions.OutputDir = outDir
 	}
 
-	if err := req.DecodeFile(fileEntry.Encoding, artifactPath, outputPath); err != nil {
+	outputPath, err := req.DecodeArtifact(decodeOptions)
+	if err != nil {
 		return "", fmt.Errorf("decode file: %w", err)
 	}
 
@@ -82,16 +87,6 @@ func verifyOutputDigest(fileEntry data.File, finalPath string) error {
 
 	return nil
 }
-
-func isArchiveEncoding(encoding string) bool {
-	switch strings.TrimSpace(strings.ToLower(encoding)) {
-	case "tar+gzip", "tar+xz":
-		return true
-	default:
-		return false
-	}
-}
-
 func resolveOutDir(fileEntry data.File) (string, error) {
 	outDir := shared.DefaultData(fileEntry.OutDir, ".")
 	expanded, err := shared.ExpandPath(outDir)

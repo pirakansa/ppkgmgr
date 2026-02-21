@@ -9,23 +9,36 @@ import (
 
 	"github.com/pirakansa/ppkgmgr/internal/cli/shared"
 	"github.com/pirakansa/ppkgmgr/internal/data"
+	"github.com/pirakansa/ppkgmgr/pkg/req"
 )
+
+type downloadOptions struct {
+	spider          bool
+	forceOverwrite  bool
+	safeguardForced bool
+}
 
 // DownloadFiles walks through every file defined in the manifest and
 // downloads them using the provided downloader. When spider is true, only the
 // planned download operations are printed. When forceOverwrite is true but
 // safeguardForced is also true, digest-protected files are backed up before
 // overwriting to preserve user changes.
-func DownloadFiles(fd data.FileData, downloader shared.DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite, safeguardForced bool) error {
+func DownloadFiles(manifestData data.FileData, downloader shared.DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite, safeguardForced bool) error {
 	if downloader == nil && !spider {
 		fmt.Fprintln(stderr, "downloader is required")
 		return shared.Error{Code: 5}
 	}
 
+	options := downloadOptions{
+		spider:          spider,
+		forceOverwrite:  forceOverwrite,
+		safeguardForced: safeguardForced,
+	}
+
 	hadDownloadFailure := false
-	for _, repository := range fd.Repo {
+	for _, repository := range manifestData.Repo {
 		for _, fileEntry := range repository.Files {
-			if err := processDownloadEntry(repository, fileEntry, downloader, stdout, stderr, spider, forceOverwrite, safeguardForced); err != nil {
+			if err := processDownloadEntry(repository, fileEntry, downloader, stdout, stderr, options); err != nil {
 				if shared.ExitCode(err) == 4 {
 					hadDownloadFailure = true
 					continue
@@ -41,7 +54,7 @@ func DownloadFiles(fd data.FileData, downloader shared.DownloadFunc, stdout, std
 	return nil
 }
 
-func processDownloadEntry(repository data.Repositories, fileEntry data.File, downloader shared.DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite, safeguardForced bool) error {
+func processDownloadEntry(repository data.Repositories, fileEntry data.File, downloader shared.DownloadFunc, stdout, stderr io.Writer, options downloadOptions) error {
 	downloadURL := fmt.Sprintf("%s/%s", repository.Url, fileEntry.FileName)
 	plannedPath, err := resolvePlannedPath(fileEntry)
 	if err != nil {
@@ -49,12 +62,12 @@ func processDownloadEntry(repository data.Repositories, fileEntry data.File, dow
 		return shared.Error{Code: 3}
 	}
 
-	if spider {
+	if options.spider {
 		fmt.Fprintf(stdout, "%s   %s\n", downloadURL, plannedPath)
 		return nil
 	}
 
-	if err := backupExistingOutputIfNeeded(fileEntry, plannedPath, forceOverwrite, safeguardForced, stderr); err != nil {
+	if err := backupExistingOutputIfNeeded(fileEntry, plannedPath, options, stderr); err != nil {
 		return err
 	}
 
@@ -84,20 +97,20 @@ func cleanupTempArtifact(artifactPath string, stderr io.Writer) {
 }
 
 func resolvePlannedPath(fs data.File) (string, error) {
-	if isArchiveEncoding(fs.Encoding) && strings.TrimSpace(fs.Extract) == "" {
+	if req.IsArchiveEncoding(fs.Encoding) && strings.TrimSpace(fs.Extract) == "" {
 		outdir := shared.DefaultData(fs.OutDir, ".")
 		return shared.ExpandPath(outdir)
 	}
 	return ResolvePath(fs)
 }
 
-func backupExistingOutputIfNeeded(fs data.File, dlpath string, forceOverwrite, safeguardForced bool, stderr io.Writer) error {
-	archiveWhole := isArchiveEncoding(fs.Encoding) && strings.TrimSpace(fs.Extract) == ""
+func backupExistingOutputIfNeeded(fs data.File, dlpath string, options downloadOptions, stderr io.Writer) error {
+	archiveWhole := req.IsArchiveEncoding(fs.Encoding) && strings.TrimSpace(fs.Extract) == ""
 	if archiveWhole {
 		return nil
 	}
 
-	if !forceOverwrite {
+	if !options.forceOverwrite {
 		if backupPath, err := shared.BackupOutputIfExists(dlpath); err != nil {
 			fmt.Fprintf(stderr, "failed to backup %s: %v\n", dlpath, err)
 			return shared.Error{Code: 3}
@@ -107,7 +120,7 @@ func backupExistingOutputIfNeeded(fs data.File, dlpath string, forceOverwrite, s
 		return nil
 	}
 
-	if !safeguardForced || strings.TrimSpace(fs.Digest) == "" {
+	if !options.safeguardForced || strings.TrimSpace(fs.Digest) == "" {
 		return nil
 	}
 
