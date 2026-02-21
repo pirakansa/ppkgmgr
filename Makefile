@@ -10,7 +10,7 @@ DARWIN_AMD64 := darwin-amd64
 DARWIN_ARM64 := darwin-arm64
 WIN_AMD64    := win-amd64
 CMD_DIR      := ./cmd/$(PROJECT_NAME)
-VERSION      := 0.8.0
+VERSION      := 0.9.0
 GO_LDFLAGS   := -ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
 GO_TAGS      := osusergo netgo
 GO_TAG_FLAGS := -tags="$(GO_TAGS)"
