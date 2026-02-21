@@ -10,8 +10,12 @@ Keep documentation easy to navigate and accurate against the current implementat
 
 ## Terminology
 - SoT (Source of Truth): the primary authority used to judge correctness; in this skill, code plus passing tests.
-- approved: explicitly reviewed and accepted baseline (for example an approved specification revision).
 - drift: mismatch between docs and their SoT.
+
+## Classification Rule
+- User guide: explains practical usage (how to operate/use the tool in real workflows).
+- Specification reference: defines interface/behavior (contract, schema, flags, processing rules, constraints).
+- If a section includes both, split it and keep each part in the appropriate document.
 
 ## When Not To Use
 - Do not use this skill for specification-first authoring (for example requirement definition, design proposals, ADR drafting, or RFC creation before implementation).
@@ -40,7 +44,7 @@ Keep documentation easy to navigate and accurate against the current implementat
    - Map each behavior to a target doc section.
    - Add missing sections before polishing wording.
 3. Update docs with minimal duplication
-   - Keep a single SoT for each topic.
+   - Keep a single source of truth for each topic.
    - In README, keep short pointers/links instead of long repeated explanations.
    - Ensure command examples and option names exactly match current CLI.
 4. Drift check (implementation vs docs)
