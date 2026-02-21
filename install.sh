@@ -10,6 +10,7 @@ set -euo pipefail
 
 REPO="pirakansa/ppkgmgr"
 BINARY_NAME="ppkgmgr"
+TEMP_DIR=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -28,6 +29,12 @@ warn() {
 error() {
     echo -e "${RED}[ERROR]${NC} $1" >&2
     exit 1
+}
+
+cleanup() {
+    if [ -n "${TEMP_DIR:-}" ]; then
+        rm -rf "$TEMP_DIR"
+    fi
 }
 
 # Detect OS
@@ -66,7 +73,9 @@ get_latest_version() {
 
 # Main installation logic
 main() {
-    local os arch version install_dir archive_name url temp_dir
+    local os arch version install_dir archive_name url
+
+    trap cleanup EXIT
 
     os=$(detect_os)
     arch=$(detect_arch)
@@ -94,30 +103,29 @@ main() {
     info "Downloading from ${url}"
 
     # Create temp directory
-    temp_dir=$(mktemp -d)
-    trap 'rm -rf "$temp_dir"' EXIT
+    TEMP_DIR=$(mktemp -d)
 
     # Download and extract
     if command -v curl &> /dev/null; then
-        curl -fsSL "$url" -o "${temp_dir}/${archive_name}"
+        curl -fsSL "$url" -o "${TEMP_DIR}/${archive_name}"
     elif command -v wget &> /dev/null; then
-        wget -q "$url" -O "${temp_dir}/${archive_name}"
+        wget -q "$url" -O "${TEMP_DIR}/${archive_name}"
     else
         error "Neither curl nor wget found. Please install one of them."
     fi
 
     # Extract archive
-    tar -xzf "${temp_dir}/${archive_name}" -C "$temp_dir"
+    tar -xzf "${TEMP_DIR}/${archive_name}" -C "$TEMP_DIR"
 
     # Create install directory if needed
     mkdir -p "$install_dir"
 
     # Install binary
     if [ "$os" = "windows" ]; then
-        mv "${temp_dir}/${BINARY_NAME}.exe" "${install_dir}/"
+        mv "${TEMP_DIR}/${BINARY_NAME}.exe" "${install_dir}/"
         info "Installed ${BINARY_NAME}.exe to ${install_dir}"
     else
-        mv "${temp_dir}/${BINARY_NAME}" "${install_dir}/"
+        mv "${TEMP_DIR}/${BINARY_NAME}" "${install_dir}/"
         chmod +x "${install_dir}/${BINARY_NAME}"
         info "Installed ${BINARY_NAME} to ${install_dir}"
     fi
