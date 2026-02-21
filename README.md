@@ -74,20 +74,20 @@ For full command examples and operational details, see:
 
 - [docs/usage.md](./docs/usage.md)
 
-### Manifest and artifact guides
+## Documentation
 
-Detailed guides are available under `docs/`:
+### User guides
 
-- Manifest reference: [docs/manifest.md](./docs/manifest.md)
+- Usage and CLI operations: [docs/usage.md](./docs/usage.md)
 - Artifact authoring workflow: [docs/artifact-authoring.md](./docs/artifact-authoring.md)
+- Release workflow (GitHub Actions): [docs/release-manifest-workflow.md](./docs/release-manifest-workflow.md)
 
-## YAML Files
+### Specification references
 
-The tool uses YAML manifests to define repositories and file operations.
-
-- Current format: `version: 3` (defaults to `3` when omitted)
-- Full schema and behavior: [docs/manifest.md](./docs/manifest.md)
+- Manifest specification (current format `version: 3`): [docs/manifest.md](./docs/manifest.md)
+- GitHub Action interface specification: [docs/github-action.md](./docs/github-action.md)
 - Reference fixture: [test/data/testdata.yml](./test/data/testdata.yml)
+- Documentation index: [docs/README.md](./docs/README.md)
 
 ## Development
 

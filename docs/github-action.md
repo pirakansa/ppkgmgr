@@ -1,4 +1,4 @@
-# GitHub Action Reference
+# GitHub Action Specification
 
 This document describes the `pirakansa/ppkgmgr@v0` GitHub Action interface based on `action.yml`.
 

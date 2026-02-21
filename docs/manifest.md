@@ -1,4 +1,6 @@
-# Manifest Reference
+# Manifest Specification
+
+This document defines the manifest interface and behavior.
 
 Current `ppkgmgr` manifest format: `version: 3`
 
