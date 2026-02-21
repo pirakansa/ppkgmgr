@@ -301,6 +301,86 @@ func TestDownloadManifestFiles_TarXzExtractAllAndSymlink(t *testing.T) {
 	}
 }
 
+func TestDownloadManifestFiles_InvalidMode(t *testing.T) {
+	outDir := t.TempDir()
+	fd := data.FileData{
+		Repo: []data.Repositories{
+			{
+				Url: "https://example.com",
+				Files: []data.File{
+					{
+						FileName: "tool.bin",
+						OutDir:   outDir,
+						Mode:     "not-octal",
+					},
+				},
+			},
+		},
+	}
+
+	downloader := func(_, path string) (int64, error) {
+		if err := os.WriteFile(path, []byte("tool"), 0o644); err != nil {
+			return 0, err
+		}
+		return 4, nil
+	}
+
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false)
+	if err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+	var cliErr cliError
+	if !errors.As(err, &cliErr) || cliErr.Code != 4 {
+		t.Fatalf("expected cli error code 4, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "invalid mode") {
+		t.Fatalf("expected invalid mode message, got %q", stderr.String())
+	}
+}
+
+func TestDownloadManifestFiles_InvalidSymlinkTarget(t *testing.T) {
+	outDir := t.TempDir()
+	linkPath := filepath.Join(t.TempDir(), "tool")
+	fd := data.FileData{
+		Repo: []data.Repositories{
+			{
+				Url: "https://example.com",
+				Files: []data.File{
+					{
+						FileName: "tool.bin",
+						OutDir:   outDir,
+						Symlink: &data.SymlinkConfig{
+							Link:   linkPath,
+							Target: "",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	downloader := func(_, path string) (int64, error) {
+		if err := os.WriteFile(path, []byte("tool"), 0o644); err != nil {
+			return 0, err
+		}
+		return 4, nil
+	}
+
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false)
+	if err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+	var cliErr cliError
+	if !errors.As(err, &cliErr) || cliErr.Code != 4 {
+		t.Fatalf("expected cli error code 4, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "symlink target is required") {
+		t.Fatalf("expected symlink target error, got %q", stderr.String())
+	}
+}
+
 func compressZstd(tb testing.TB, contents []byte) []byte {
 	tb.Helper()
 	var buf bytes.Buffer
