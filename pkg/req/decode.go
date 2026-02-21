@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/klauspost/compress/zstd"
 )
@@ -16,8 +15,7 @@ func DecodeFile(encoding, srcPath, dstPath string) error {
 		return err
 	}
 
-	cleaned := strings.TrimSpace(strings.ToLower(encoding))
-	switch cleaned {
+	switch normalizeEncoding(encoding) {
 	case "", "none":
 		return copyFile(srcPath, dstPath)
 	case "zstd":

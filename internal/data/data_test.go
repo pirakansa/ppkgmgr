@@ -18,6 +18,10 @@ func TestParseSuccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	if fd.Version != 2 {
+		t.Fatalf("expected version 2, got %d", fd.Version)
+	}
+
 	if len(fd.Repo) != 3 {
 		t.Fatalf("expected 3 repositories, got %d", len(fd.Repo))
 	}
@@ -155,5 +159,22 @@ func TestParseRemoteUnexpectedStatus(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unexpected status") {
 		t.Fatalf("expected unexpected status error, got %v", err)
+	}
+}
+
+func TestParseDefaultsVersionTo3WhenMissing(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "manifest.yml")
+	raw := "repositories:\n  - url: https://example.com\n    files:\n      - file_name: app\n        out_dir: ./bin\n"
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+
+	fd, err := Parse(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fd.Version != 3 {
+		t.Fatalf("expected default version 3, got %d", fd.Version)
 	}
 }

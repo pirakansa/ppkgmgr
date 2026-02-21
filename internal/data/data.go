@@ -13,7 +13,8 @@ import (
 
 // FileData represents the manifest root document.
 type FileData struct {
-	Repo []Repositories `yaml:"repositories"`
+	Version int            `yaml:"version,omitempty"`
+	Repo    []Repositories `yaml:"repositories"`
 }
 
 // Repositories describes a manifest repository entry.
@@ -25,12 +26,21 @@ type Repositories struct {
 
 // File describes a downloadable file entry.
 type File struct {
-	FileName       string `yaml:"file_name"`
-	Digest         string `yaml:"digest,omitempty"`
-	ArtifactDigest string `yaml:"artifact_digest,omitempty"`
-	Encoding       string `yaml:"encoding,omitempty"`
-	Rename         string `yaml:"rename,omitempty"`
-	OutDir         string `yaml:"out_dir"`
+	FileName       string         `yaml:"file_name"`
+	Digest         string         `yaml:"digest,omitempty"`
+	ArtifactDigest string         `yaml:"artifact_digest,omitempty"`
+	Encoding       string         `yaml:"encoding,omitempty"`
+	Extract        string         `yaml:"extract,omitempty"`
+	Rename         string         `yaml:"rename,omitempty"`
+	Mode           string         `yaml:"mode,omitempty"`
+	Symlink        *SymlinkConfig `yaml:"symlink,omitempty"`
+	OutDir         string         `yaml:"out_dir"`
+}
+
+// SymlinkConfig describes symbolic link creation after file placement.
+type SymlinkConfig struct {
+	Link   string `yaml:"link"`
+	Target string `yaml:"target"`
 }
 
 // Parse loads and decodes the manifest at the provided path.
@@ -44,6 +54,10 @@ func Parse(path string) (FileData, error) {
 
 	if err := yaml.Unmarshal(raw, &fd); err != nil {
 		return fd, fmt.Errorf("decode yaml: %w", err)
+	}
+
+	if fd.Version == 0 {
+		fd.Version = 3
 	}
 
 	return fd, nil

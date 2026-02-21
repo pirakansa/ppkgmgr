@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/pirakansa/ppkgmgr/internal/cli/manifest"
 	"github.com/pirakansa/ppkgmgr/internal/data"
+	"github.com/ulikunitz/xz"
 	"github.com/zeebo/blake3"
 )
 
@@ -190,6 +193,194 @@ func TestDownloadManifestFiles_UnsupportedEncoding(t *testing.T) {
 	}
 }
 
+func TestDownloadManifestFiles_TarGzipExtractWithRenameAndMode(t *testing.T) {
+	archive := createTarGzip(t, map[string][]byte{
+		"codex-x86_64-unknown-linux-musl": []byte("codex-binary"),
+	})
+
+	outDir := t.TempDir()
+	fd := data.FileData{
+		Repo: []data.Repositories{
+			{
+				Url: "https://example.com",
+				Files: []data.File{
+					{
+						FileName: "codex.tar.gz",
+						Encoding: "tar+gzip",
+						Extract:  "codex-x86_64-unknown-linux-musl",
+						Rename:   "codex",
+						OutDir:   outDir,
+						Mode:     "0755",
+					},
+				},
+			},
+		},
+	}
+
+	downloader := func(_, path string) (int64, error) {
+		if err := os.WriteFile(path, archive, 0o644); err != nil {
+			return 0, err
+		}
+		return int64(len(archive)), nil
+	}
+
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	if err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false); err != nil {
+		t.Fatalf("downloadManifestFiles returned error: %v (stderr: %s)", err, stderr.String())
+	}
+
+	outPath := filepath.Join(outDir, "codex")
+	contents, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted file: %v", err)
+	}
+	if string(contents) != "codex-binary" {
+		t.Fatalf("unexpected extracted content: %q", string(contents))
+	}
+	info, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatalf("failed to stat extracted file: %v", err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Fatalf("expected mode 0755, got %o", info.Mode().Perm())
+	}
+}
+
+func TestDownloadManifestFiles_TarXzExtractAllAndSymlink(t *testing.T) {
+	archive := createTarXz(t, map[string][]byte{
+		"node-v24.13.1-linux-x64/bin/node": []byte("node-binary"),
+		"node-v24.13.1-linux-x64/lib/a.js": []byte("console.log('ok')"),
+	})
+
+	root := t.TempDir()
+	outDir := filepath.Join(root, "lib")
+	linkPath := filepath.Join(root, "node")
+
+	fd := data.FileData{
+		Repo: []data.Repositories{
+			{
+				Url: "https://example.com",
+				Files: []data.File{
+					{
+						FileName: "node.tar.xz",
+						Encoding: "tar+xz",
+						OutDir:   outDir,
+						Symlink: &data.SymlinkConfig{
+							Link:   linkPath,
+							Target: "node-v24.13.1-linux-x64",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	downloader := func(_, path string) (int64, error) {
+		if err := os.WriteFile(path, archive, 0o644); err != nil {
+			return 0, err
+		}
+		return int64(len(archive)), nil
+	}
+
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	if err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false); err != nil {
+		t.Fatalf("downloadManifestFiles returned error: %v (stderr: %s)", err, stderr.String())
+	}
+
+	nodePath := filepath.Join(outDir, "node-v24.13.1-linux-x64", "bin", "node")
+	if _, err := os.Stat(nodePath); err != nil {
+		t.Fatalf("expected extracted tree at %s: %v", nodePath, err)
+	}
+
+	resolvedTarget, err := os.Readlink(linkPath)
+	if err != nil {
+		t.Fatalf("expected symlink %s: %v", linkPath, err)
+	}
+	if resolvedTarget != "node-v24.13.1-linux-x64" {
+		t.Fatalf("expected symlink target %q, got %q", "node-v24.13.1-linux-x64", resolvedTarget)
+	}
+}
+
+func TestDownloadManifestFiles_InvalidMode(t *testing.T) {
+	outDir := t.TempDir()
+	fd := data.FileData{
+		Repo: []data.Repositories{
+			{
+				Url: "https://example.com",
+				Files: []data.File{
+					{
+						FileName: "tool.bin",
+						OutDir:   outDir,
+						Mode:     "not-octal",
+					},
+				},
+			},
+		},
+	}
+
+	downloader := func(_, path string) (int64, error) {
+		if err := os.WriteFile(path, []byte("tool"), 0o644); err != nil {
+			return 0, err
+		}
+		return 4, nil
+	}
+
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false)
+	if err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+	var cliErr cliError
+	if !errors.As(err, &cliErr) || cliErr.Code != 4 {
+		t.Fatalf("expected cli error code 4, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "invalid mode") {
+		t.Fatalf("expected invalid mode message, got %q", stderr.String())
+	}
+}
+
+func TestDownloadManifestFiles_InvalidSymlinkTarget(t *testing.T) {
+	outDir := t.TempDir()
+	linkPath := filepath.Join(t.TempDir(), "tool")
+	fd := data.FileData{
+		Repo: []data.Repositories{
+			{
+				Url: "https://example.com",
+				Files: []data.File{
+					{
+						FileName: "tool.bin",
+						OutDir:   outDir,
+						Symlink: &data.SymlinkConfig{
+							Link:   linkPath,
+							Target: "",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	downloader := func(_, path string) (int64, error) {
+		if err := os.WriteFile(path, []byte("tool"), 0o644); err != nil {
+			return 0, err
+		}
+		return 4, nil
+	}
+
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	err := manifest.DownloadFiles(fd, downloader, stdout, stderr, false, true, false)
+	if err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+	var cliErr cliError
+	if !errors.As(err, &cliErr) || cliErr.Code != 4 {
+		t.Fatalf("expected cli error code 4, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "symlink target is required") {
+		t.Fatalf("expected symlink target error, got %q", stderr.String())
+	}
+}
+
 func compressZstd(tb testing.TB, contents []byte) []byte {
 	tb.Helper()
 	var buf bytes.Buffer
@@ -207,4 +398,65 @@ func compressZstd(tb testing.TB, contents []byte) []byte {
 func hashHex(data []byte) string {
 	sum := blake3.Sum256(data)
 	return fmt.Sprintf("%x", sum[:])
+}
+
+func createTarGzip(tb testing.TB, files map[string][]byte) []byte {
+	tb.Helper()
+
+	var compressed bytes.Buffer
+	gzw := gzip.NewWriter(&compressed)
+	tw := tar.NewWriter(gzw)
+	for name, content := range files {
+		header := &tar.Header{
+			Name: name,
+			Mode: 0o755,
+			Size: int64(len(content)),
+		}
+		if err := tw.WriteHeader(header); err != nil {
+			tb.Fatalf("write tar header: %v", err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			tb.Fatalf("write tar content: %v", err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		tb.Fatalf("close tar writer: %v", err)
+	}
+	if err := gzw.Close(); err != nil {
+		tb.Fatalf("close gzip writer: %v", err)
+	}
+
+	return compressed.Bytes()
+}
+
+func createTarXz(tb testing.TB, files map[string][]byte) []byte {
+	tb.Helper()
+
+	var compressed bytes.Buffer
+	xzw, err := xz.NewWriter(&compressed)
+	if err != nil {
+		tb.Fatalf("create xz writer: %v", err)
+	}
+	tw := tar.NewWriter(xzw)
+	for name, content := range files {
+		header := &tar.Header{
+			Name: name,
+			Mode: 0o755,
+			Size: int64(len(content)),
+		}
+		if err := tw.WriteHeader(header); err != nil {
+			tb.Fatalf("write tar header: %v", err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			tb.Fatalf("write tar content: %v", err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		tb.Fatalf("close tar writer: %v", err)
+	}
+	if err := xzw.Close(); err != nil {
+		tb.Fatalf("close xz writer: %v", err)
+	}
+
+	return compressed.Bytes()
 }
