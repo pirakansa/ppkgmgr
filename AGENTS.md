@@ -24,16 +24,15 @@ Rule of thumb:
 
 ---
 
-## 1. Setup Steps
+## Setup Steps
 
-* Recommended: VS Code Dev Container / GitHub Codespaces (use the `.devcontainer/` image).
 * Confirm you have write permission under `go env GOPATH` and that `go install` works.
 * On the first run, execute `go mod tidy` at the project root to make sure dependencies are intact.
 * Task runner: `Makefile` (CI uses the `make` targets described later).
 
 ---
 
-## 2. Build & Validate
+## Build & Validate
 
 * Build: `make build`
 * Test: `make test`
@@ -134,7 +133,7 @@ Confirm `make lint` / `make test` / `make build` succeed locally before opening 
 
 ---
 
-## 9. Branch Workflow (GitHub Flow)
+## Branch Workflow (GitHub Flow)
 
 This project follows **GitHub Flow** based on `main`.
 

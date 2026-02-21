@@ -91,6 +91,8 @@ For full command examples and operational details, see:
 
 ## Development
 
+Recommended for contributors: use VS Code Dev Container or GitHub Codespaces with the `.devcontainer/` image.
+
 ### Build
 Build the project using:
 ```sh
