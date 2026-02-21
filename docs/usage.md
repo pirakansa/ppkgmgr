@@ -1,38 +1,117 @@
 # Usage
 
-## Command Examples
+## Quick Reference
 
 ```sh
-$ ppkgmgr help  # Display available subcommands and usage
-$ ppkgmgr dl <path_or_url_to_yaml>  # Execute with a YAML file from disk or an HTTP(S) URL
-$ ppkgmgr dl --overwrite <path_or_url_to_yaml>  # Overwrite existing files without keeping backups
-$ ppkgmgr dl --spider <path_or_url_to_yaml>  # Preview download URLs and paths
-$ ppkgmgr repo add <path_or_url_to_yaml>  # Backup the manifest under ~/.ppkgmgr for later use
-$ ppkgmgr repo ls  # Show registered manifests stored locally
-$ ppkgmgr repo rm <id_or_source>  # Remove a stored manifest by ID or source URL/path
-$ ppkgmgr pkg up  # Refresh stored manifests under ~/.ppkgmgr and redownload their files
-$ ppkgmgr pkg up --redownload  # Refresh and download even when manifest digests match (backups still apply when possible)
-$ ppkgmgr ver  # Display version information
-$ ppkgmgr util dig <path_to_file>  # Show the BLAKE3 digest for a file
-$ ppkgmgr util dig --format yaml <path_to_file>  # Emit a manifest-ready YAML snippet for a file's digest
-$ ppkgmgr util dig --mode artifact --format yaml <path_to_artifact>  # Emit digest + artifact_digest for a compressed artifact
-$ ppkgmgr util zstd <src> <dst>  # Compress a file with zstd and print the resulting digest
+ppkgmgr help                  # Show available subcommands and usage
+ppkgmgr dl <manifest>         # Download files defined in a manifest
+ppkgmgr repo add <manifest>   # Register a manifest locally
+ppkgmgr pkg up                # Refresh stored manifests and redownload files
+ppkgmgr ver                   # Display version information
+ppkgmgr util dig <file>       # Compute the BLAKE3 digest of a file
+ppkgmgr util zstd <src> <dst> # Compress a file with zstd and print the digest
 ```
 
-## Repository and registry behavior
+> `<manifest>` accepts a local file path or an HTTP(S) URL.
 
-`repo add` keeps a copy of the manifest under `~/.ppkgmgr/manifests` and maintains metadata (including source path/URL and digest) inside `~/.ppkgmgr/registry.json`. Use `repo ls` to inspect saved manifests and `repo rm` when you want to delete an entry.
+---
 
-`pkg up` reads the stored manifests under `~/.ppkgmgr`, refreshes them from their original sources when possible, and downloads all referenced files so local copies stay up to date. When the refreshed manifest has the same digest as the stored copy, downloads are skipped to avoid unnecessary work. Pass `--redownload` when you want to bypass the digest check and download anyway; this does **not** disable backup behavior.
+## Commands
 
-## Data directory
+### `dl` — Download Files
 
-Set the `PPKGMGR_HOME` environment variable when you need to relocate the internal state directory (defaults to `~/.ppkgmgr`). This applies to commands such as `repo add`, `repo ls`, `repo rm`, and `pkg up` that read or write registry data and stored manifests.
+Downloads files defined in a manifest YAML.
 
-## Backup behavior
+```sh
+ppkgmgr dl <manifest>              # Basic download
+ppkgmgr dl -o <manifest>           # Overwrite existing files without backups
+ppkgmgr dl --spider <manifest>     # Preview download URLs and paths (no actual download)
+```
 
-Running `ppkgmgr dl` without additional flags preserves pre-existing files by moving them to `<filename>.bak` (or a numbered variant) before downloading replacements. Supply `-o`/`--overwrite` when you want to skip this backup and overwrite files immediately.
+| Flag | Short | Description |
+|---|---|---|
+| `--overwrite` | `-o` | Overwrite existing files without creating backups |
+| `--spider` | — | Print URLs and destination paths only |
 
-The same safeguard applies when `pkg up` notices a digest-protected file has been modified locally (even if `--redownload` is used) or when `repo rm` deletes tracked files—those files are renamed to `.bak` variants so user changes stay recoverable.
+### `repo` — Manifest Management
 
-Files without digests are always overwritten because the tool cannot determine whether a user modification occurred.
+Registers, lists, and removes manifests stored under `~/.ppkgmgr`. Manifest metadata (source path/URL and digest) is maintained in `~/.ppkgmgr/registry.json`.
+
+```sh
+ppkgmgr repo add <manifest>        # Register a manifest
+ppkgmgr repo ls                    # List registered manifests
+ppkgmgr repo rm <id_or_source>     # Remove a manifest by ID or source URL/path
+```
+
+### `pkg up` — Bulk Update
+
+Refreshes stored manifests from their original sources and downloads all referenced files to keep local copies up to date.
+
+```sh
+ppkgmgr pkg up                     # Update (skip when digest matches)
+ppkgmgr pkg up --redownload        # Force download even when digest matches
+```
+
+| Flag | Short | Description |
+|---|---|---|
+| `--redownload` | `-r` | Download even if the manifest digest matches (backup behavior is preserved) |
+
+### `ver` — Version Information
+
+```sh
+ppkgmgr ver
+```
+
+### `util` — Utilities
+
+#### `util dig` — Digest Computation
+
+Computes the BLAKE3 digest of a file.
+
+```sh
+ppkgmgr util dig <file>                                  # Print the digest
+ppkgmgr util dig --format yaml <file>                    # Emit a manifest-ready YAML snippet
+ppkgmgr util dig --mode artifact --format yaml <file>    # Emit digest + artifact_digest for a compressed artifact
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--format` | `raw` | Output format: `raw` (hash only) / `yaml` (YAML snippet) |
+| `--mode` | `file` | Input mode: `file` (regular file) / `artifact` (compressed artifact) |
+
+#### `util zstd` — Zstd Compression
+
+Compresses a file with zstd and prints the resulting BLAKE3 digest.
+
+```sh
+ppkgmgr util zstd <src> <dst>
+```
+
+---
+
+## Configuration
+
+### Data Directory (`PPKGMGR_HOME`)
+
+The internal state directory defaults to `~/.ppkgmgr`. Set the `PPKGMGR_HOME` environment variable to relocate it.
+
+```sh
+export PPKGMGR_HOME=/path/to/custom/dir
+```
+
+This affects commands that read or write registry data and stored manifests, such as `repo add`, `repo ls`, `repo rm`, and `pkg up`.
+
+---
+
+## Backup Behavior
+
+By default, `ppkgmgr dl` renames pre-existing files to `<filename>.bak` (or a numbered variant) before downloading replacements. Pass `-o` / `--overwrite` to skip backups and overwrite immediately.
+
+The same backup safeguard also applies in the following scenarios:
+
+- **`pkg up`**: When a digest-protected file has been modified locally (including when `--redownload` is used)
+- **`repo rm`**: When deleting tracked files
+
+In all cases, files are renamed to `.bak` variants so that user changes remain recoverable.
+
+> **Note:** Files without digests are always overwritten because the tool cannot detect whether a user modification occurred.

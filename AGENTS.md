@@ -175,6 +175,7 @@ For structured authoring (template, checklist), use the skill: `conventional-com
 
 ## Documentation Policy
 
+- **Language**: All documentation (README.md, docs/, inline doc-comments) MUST be written in **English**.
 - **README.md (top level)** is onboarding-first: overview, install, and one quick-start. Keep it short and link to details in `docs/`.
 - **docs/** holds detailed documentation and is organized as:
   - **User guides** (practical usage / workflows)
