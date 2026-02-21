@@ -13,71 +13,71 @@ import (
 	"github.com/pirakansa/ppkgmgr/pkg/req"
 )
 
-func processDownloadedFile(fs data.File, artifactPath, outputPath string) error {
-	if strings.TrimSpace(fs.ArtifactDigest) != "" {
-		match, actual, err := shared.VerifyDigest(artifactPath, fs.ArtifactDigest)
+func processDownloadedArtifact(fileEntry data.File, artifactPath, outputPath string) error {
+	if strings.TrimSpace(fileEntry.ArtifactDigest) != "" {
+		match, actual, err := shared.VerifyDigest(artifactPath, fileEntry.ArtifactDigest)
 		if err != nil {
 			return fmt.Errorf("verify artifact digest: %w", err)
 		}
 		if !match {
-			return fmt.Errorf("artifact digest mismatch: expected %s, got %s", fs.ArtifactDigest, actual)
+			return fmt.Errorf("artifact digest mismatch: expected %s, got %s", fileEntry.ArtifactDigest, actual)
 		}
 	}
 
-	finalPath, err := decodeToOutput(fs, artifactPath, outputPath)
+	finalPath, err := decodeArtifactToOutput(fileEntry, artifactPath, outputPath)
 	if err != nil {
 		return err
 	}
 
-	if err := verifyDecodedDigest(fs, finalPath); err != nil {
+	if err := verifyOutputDigest(fileEntry, finalPath); err != nil {
 		return err
 	}
 
-	if err := applyMode(finalPath, fs.Mode); err != nil {
+	if err := applyOutputMode(finalPath, fileEntry.Mode); err != nil {
 		return err
 	}
 
-	if err := applySymlink(fs); err != nil {
+	if err := applyOutputSymlink(fileEntry); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func decodeToOutput(fs data.File, artifactPath, outputPath string) (string, error) {
-	if isArchiveEncoding(fs.Encoding) {
-		outDir, err := resolveOutDir(fs)
+func decodeArtifactToOutput(fileEntry data.File, artifactPath, outputPath string) (string, error) {
+	if isArchiveEncoding(fileEntry.Encoding) {
+		outDir, err := resolveOutDir(fileEntry)
 		if err != nil {
 			return "", err
 		}
-		extractedPath, err := req.ExtractArchive(fs.Encoding, artifactPath, outDir, fs.Extract, fs.Rename)
+		extractedPath, err := req.ExtractArchive(fileEntry.Encoding, artifactPath, outDir, fileEntry.Extract, fileEntry.Rename)
 		if err != nil {
 			return "", fmt.Errorf("decode file: %w", err)
 		}
 		return extractedPath, nil
 	}
 
-	if err := req.DecodeFile(fs.Encoding, artifactPath, outputPath); err != nil {
+	if err := req.DecodeFile(fileEntry.Encoding, artifactPath, outputPath); err != nil {
 		return "", fmt.Errorf("decode file: %w", err)
 	}
 
 	return outputPath, nil
 }
 
-func verifyDecodedDigest(fs data.File, finalPath string) error {
-	if strings.TrimSpace(fs.Digest) == "" {
+func verifyOutputDigest(fileEntry data.File, finalPath string) error {
+	if strings.TrimSpace(fileEntry.Digest) == "" {
 		return nil
 	}
 	if finalPath == "" {
 		return fmt.Errorf("digest requires extract to target a single output path")
 	}
 
-	match, actual, err := shared.VerifyDigest(finalPath, fs.Digest)
+	match, actual, err := shared.VerifyDigest(finalPath, fileEntry.Digest)
 	if err != nil {
 		return fmt.Errorf("verify digest: %w", err)
 	}
 	if !match {
-		return cleanupOutputFile(finalPath, fmt.Errorf("digest mismatch: expected %s, got %s", fs.Digest, actual))
+		return cleanupOutputFile(finalPath, fmt.Errorf("digest mismatch: expected %s, got %s", fileEntry.Digest, actual))
 	}
 
 	return nil
@@ -92,8 +92,8 @@ func isArchiveEncoding(encoding string) bool {
 	}
 }
 
-func resolveOutDir(fs data.File) (string, error) {
-	outDir := shared.DefaultData(fs.OutDir, ".")
+func resolveOutDir(fileEntry data.File) (string, error) {
+	outDir := shared.DefaultData(fileEntry.OutDir, ".")
 	expanded, err := shared.ExpandPath(outDir)
 	if err != nil {
 		return "", fmt.Errorf("expand output directory %q: %w", outDir, err)
@@ -101,7 +101,7 @@ func resolveOutDir(fs data.File) (string, error) {
 	return expanded, nil
 }
 
-func applyMode(path, modeValue string) error {
+func applyOutputMode(path, modeValue string) error {
 	if path == "" || strings.TrimSpace(modeValue) == "" {
 		return nil
 	}
@@ -115,17 +115,17 @@ func applyMode(path, modeValue string) error {
 	return nil
 }
 
-func applySymlink(fs data.File) error {
-	if fs.Symlink == nil {
+func applyOutputSymlink(fileEntry data.File) error {
+	if fileEntry.Symlink == nil {
 		return nil
 	}
-	link, err := shared.ExpandPath(fs.Symlink.Link)
+	link, err := shared.ExpandPath(fileEntry.Symlink.Link)
 	if err != nil {
-		return fmt.Errorf("expand symlink link %q: %w", fs.Symlink.Link, err)
+		return fmt.Errorf("expand symlink link %q: %w", fileEntry.Symlink.Link, err)
 	}
-	target, err := shared.ExpandPath(fs.Symlink.Target)
+	target, err := shared.ExpandPath(fileEntry.Symlink.Target)
 	if err != nil {
-		return fmt.Errorf("expand symlink target %q: %w", fs.Symlink.Target, err)
+		return fmt.Errorf("expand symlink target %q: %w", fileEntry.Symlink.Target, err)
 	}
 	if strings.TrimSpace(link) == "" {
 		return fmt.Errorf("symlink link is required")

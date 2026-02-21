@@ -22,56 +22,68 @@ func DownloadFiles(fd data.FileData, downloader shared.DownloadFunc, stdout, std
 		return shared.Error{Code: 5}
 	}
 
-	var downloadErr error
-	for _, repo := range fd.Repo {
-		for _, fs := range repo.Files {
-			dlurl := fmt.Sprintf("%s/%s", repo.Url, fs.FileName)
-			dlpath, err := resolveDisplayPath(fs)
-			if err != nil {
-				fmt.Fprintf(stderr, "failed to determine download path for %s: %v\n", fs.FileName, err)
-				return shared.Error{Code: 3}
-			}
-			if spider {
-				fmt.Fprintf(stdout, "%s   %s\n", dlurl, dlpath)
-				continue
-			}
-
-			if err := backupOutputIfNeeded(fs, dlpath, forceOverwrite, safeguardForced, stderr); err != nil {
+	hadDownloadFailure := false
+	for _, repository := range fd.Repo {
+		for _, fileEntry := range repository.Files {
+			if err := processDownloadEntry(repository, fileEntry, downloader, stdout, stderr, spider, forceOverwrite, safeguardForced); err != nil {
+				if shared.ExitCode(err) == 4 {
+					hadDownloadFailure = true
+					continue
+				}
 				return err
-			}
-
-			tmpPath, err := createTempDownloadPath(fs.FileName, stderr)
-			if err != nil {
-				return err
-			}
-
-			if _, err := downloader(dlurl, tmpPath); err != nil {
-				fmt.Fprintf(stderr, "failed to download %s: %v\n", dlurl, err)
-				downloadErr = err
-				_ = os.Remove(tmpPath)
-				continue
-			}
-
-			if err := processDownloadedFile(fs, tmpPath, dlpath); err != nil {
-				fmt.Fprintf(stderr, "failed to process %s: %v\n", dlurl, err)
-				downloadErr = err
-				_ = os.Remove(tmpPath)
-				continue
-			}
-
-			if err := os.Remove(tmpPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-				fmt.Fprintf(stderr, "warning: cleanup temp file %s: %v\n", tmpPath, err)
 			}
 		}
 	}
 
-	if downloadErr != nil {
+	if hadDownloadFailure {
 		return shared.Error{Code: 4}
 	}
 	return nil
 }
 
-func resolveDisplayPath(fs data.File) (string, error) {
+func processDownloadEntry(repository data.Repositories, fileEntry data.File, downloader shared.DownloadFunc, stdout, stderr io.Writer, spider, forceOverwrite, safeguardForced bool) error {
+	downloadURL := fmt.Sprintf("%s/%s", repository.Url, fileEntry.FileName)
+	plannedPath, err := resolvePlannedPath(fileEntry)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine download path for %s: %v\n", fileEntry.FileName, err)
+		return shared.Error{Code: 3}
+	}
+
+	if spider {
+		fmt.Fprintf(stdout, "%s   %s\n", downloadURL, plannedPath)
+		return nil
+	}
+
+	if err := backupExistingOutputIfNeeded(fileEntry, plannedPath, forceOverwrite, safeguardForced, stderr); err != nil {
+		return err
+	}
+
+	artifactPath, err := newTempArtifactPath(fileEntry.FileName, stderr)
+	if err != nil {
+		return err
+	}
+	defer cleanupTempArtifact(artifactPath, stderr)
+
+	if _, err := downloader(downloadURL, artifactPath); err != nil {
+		fmt.Fprintf(stderr, "failed to download %s: %v\n", downloadURL, err)
+		return shared.Error{Code: 4}
+	}
+
+	if err := processDownloadedArtifact(fileEntry, artifactPath, plannedPath); err != nil {
+		fmt.Fprintf(stderr, "failed to process %s: %v\n", downloadURL, err)
+		return shared.Error{Code: 4}
+	}
+
+	return nil
+}
+
+func cleanupTempArtifact(artifactPath string, stderr io.Writer) {
+	if err := os.Remove(artifactPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		fmt.Fprintf(stderr, "warning: cleanup temp file %s: %v\n", artifactPath, err)
+	}
+}
+
+func resolvePlannedPath(fs data.File) (string, error) {
 	if isArchiveEncoding(fs.Encoding) && strings.TrimSpace(fs.Extract) == "" {
 		outdir := shared.DefaultData(fs.OutDir, ".")
 		return shared.ExpandPath(outdir)
@@ -79,7 +91,7 @@ func resolveDisplayPath(fs data.File) (string, error) {
 	return ResolvePath(fs)
 }
 
-func backupOutputIfNeeded(fs data.File, dlpath string, forceOverwrite, safeguardForced bool, stderr io.Writer) error {
+func backupExistingOutputIfNeeded(fs data.File, dlpath string, forceOverwrite, safeguardForced bool, stderr io.Writer) error {
 	archiveWhole := isArchiveEncoding(fs.Encoding) && strings.TrimSpace(fs.Extract) == ""
 	if archiveWhole {
 		return nil
@@ -111,7 +123,7 @@ func backupOutputIfNeeded(fs data.File, dlpath string, forceOverwrite, safeguard
 	return nil
 }
 
-func createTempDownloadPath(fileName string, stderr io.Writer) (string, error) {
+func newTempArtifactPath(fileName string, stderr io.Writer) (string, error) {
 	tmpFile, err := os.CreateTemp("", "ppkgmgr-*")
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to create temp file for %s: %v\n", fileName, err)

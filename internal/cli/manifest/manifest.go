@@ -21,33 +21,33 @@ type Target struct {
 
 // ResolvePath returns the output path for a manifest entry, ensuring
 // that the resulting path is safe to use on the local filesystem.
-func ResolvePath(fs data.File) (string, error) {
-	outdir := shared.DefaultData(fs.OutDir, ".")
-	expandedDir, err := shared.ExpandPath(outdir)
+func ResolvePath(fileEntry data.File) (string, error) {
+	outputDir := shared.DefaultData(fileEntry.OutDir, ".")
+	expandedDir, err := shared.ExpandPath(outputDir)
 	if err != nil {
-		return "", fmt.Errorf("expand output directory %q: %w", outdir, err)
+		return "", fmt.Errorf("expand output directory %q: %w", outputDir, err)
 	}
-	outdir = expandedDir
-	outname := shared.DefaultData(fs.Rename, fs.FileName)
-	if filepath.IsAbs(outname) {
-		outname = strings.TrimPrefix(outname, filepath.VolumeName(outname))
-		outname = strings.TrimLeft(outname, "/\\")
+	outputDir = expandedDir
+	outputName := shared.DefaultData(fileEntry.Rename, fileEntry.FileName)
+	if filepath.IsAbs(outputName) {
+		outputName = strings.TrimPrefix(outputName, filepath.VolumeName(outputName))
+		outputName = strings.TrimLeft(outputName, "/\\")
 	}
-	return filepath.Join(outdir, outname), nil
+	return filepath.Join(outputDir, outputName), nil
 }
 
 // Targets collects all output paths declared in the manifest.
-func Targets(fd data.FileData) ([]Target, error) {
+func Targets(manifestData data.FileData) ([]Target, error) {
 	var targets []Target
-	for _, repo := range fd.Repo {
-		for _, fs := range repo.Files {
-			path, err := ResolvePath(fs)
+	for _, repository := range manifestData.Repo {
+		for _, fileEntry := range repository.Files {
+			path, err := ResolvePath(fileEntry)
 			if err != nil {
 				return nil, err
 			}
 			targets = append(targets, Target{
 				Path:   path,
-				Digest: strings.TrimSpace(fs.Digest),
+				Digest: strings.TrimSpace(fileEntry.Digest),
 			})
 		}
 	}
@@ -56,11 +56,11 @@ func Targets(fd data.FileData) ([]Target, error) {
 
 // ExtractTargets parses the manifest and collects all output paths.
 func ExtractTargets(path string) ([]Target, error) {
-	fd, err := data.Parse(path)
+	manifestData, err := data.Parse(path)
 	if err != nil {
 		return nil, err
 	}
-	return Targets(fd)
+	return Targets(manifestData)
 }
 
 // CleanupOldTargets removes any outdated files referenced by a manifest.
@@ -82,12 +82,12 @@ func CleanupOldTargets(targets []Target, stderr io.Writer) {
 }
 
 // FilesNeedRefresh reports whether any manifest target is missing or fails its digest.
-func FilesNeedRefresh(fd data.FileData) (bool, error) {
-	for _, repo := range fd.Repo {
-		for _, fs := range repo.Files {
-			path, err := ResolvePath(fs)
+func FilesNeedRefresh(manifestData data.FileData) (bool, error) {
+	for _, repository := range manifestData.Repo {
+		for _, fileEntry := range repository.Files {
+			path, err := ResolvePath(fileEntry)
 			if err != nil {
-				return false, fmt.Errorf("resolve output path for %s: %w", fs.FileName, err)
+				return false, fmt.Errorf("resolve output path for %s: %w", fileEntry.FileName, err)
 			}
 			info, err := os.Stat(path)
 			if err != nil {
@@ -99,7 +99,7 @@ func FilesNeedRefresh(fd data.FileData) (bool, error) {
 			if info.IsDir() {
 				return true, nil
 			}
-			digest := strings.TrimSpace(fs.Digest)
+			digest := strings.TrimSpace(fileEntry.Digest)
 			if digest == "" {
 				continue
 			}
