@@ -13,7 +13,7 @@ curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh |
 You can specify a version and installation directory:
 
 ```sh
-PPKGMGR_VERSION=v0.9.0 PPKGMGR_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
+PPKGMGR_VERSION=v0.9.1 PPKGMGR_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/pirakansa/ppkgmgr/main/install.sh | bash
 ```
 
 ### Using `go install`
@@ -50,7 +50,7 @@ With options:
 - uses: pirakansa/ppkgmgr@v0
   with:
     manifest: https://example.com/manifest.yml
-    version: v0.9.0      # Pin to a specific version (default: latest)
+    version: v0.9.1      # Pin to a specific version (default: latest)
     overwrite: true      # Overwrite existing files without backups
 ```
 
