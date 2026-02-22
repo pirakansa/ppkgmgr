@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ulikunitz/xz"
 )
@@ -75,7 +76,7 @@ func extractTarStream(reader *tar.Reader, dstDir string) error {
 			if err := os.MkdirAll(path, fs.FileMode(header.Mode).Perm()); err != nil {
 				return fmt.Errorf("create directory %q: %w", path, err)
 			}
-		case tar.TypeReg:
+		case tar.TypeReg, 0:
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return fmt.Errorf("create parent directory for %q: %w", path, err)
 			}
@@ -89,6 +90,35 @@ func extractTarStream(reader *tar.Reader, dstDir string) error {
 			}
 			if err := file.Close(); err != nil {
 				return fmt.Errorf("close file %q: %w", path, err)
+			}
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return fmt.Errorf("create parent directory for symlink %q: %w", path, err)
+			}
+			linkTarget := strings.TrimSpace(header.Linkname)
+			if linkTarget == "" {
+				return fmt.Errorf("empty symlink target for %q", header.Name)
+			}
+			if filepath.IsAbs(linkTarget) {
+				return fmt.Errorf("absolute symlink target is not allowed for %q: %q", header.Name, header.Linkname)
+			}
+			if err := os.Symlink(linkTarget, path); err != nil {
+				return fmt.Errorf("create symlink %q -> %q: %w", path, linkTarget, err)
+			}
+		case tar.TypeLink:
+			linkTarget, err := safeRelativePath(header.Linkname)
+			if err != nil {
+				return fmt.Errorf("invalid hard link target %q for %q: %w", header.Linkname, header.Name, err)
+			}
+			if linkTarget == "." {
+				return fmt.Errorf("invalid hard link target %q for %q", header.Linkname, header.Name)
+			}
+			targetPath := filepath.Join(dstDir, linkTarget)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return fmt.Errorf("create parent directory for hard link %q: %w", path, err)
+			}
+			if err := os.Link(targetPath, path); err != nil {
+				return fmt.Errorf("create hard link %q -> %q: %w", path, targetPath, err)
 			}
 		default:
 			return fmt.Errorf("unsupported tar entry type %d for %q", header.Typeflag, header.Name)
